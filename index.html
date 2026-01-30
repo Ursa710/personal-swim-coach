@@ -3,12 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>你的專屬游泳教練</title>
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="format-detection" content="telephone=no">
-    <link rel="manifest" href="manifest.json">
-    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3135/3135715.png">
+    <title>你的專屬游泳教練</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;600;900&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
     
@@ -24,19 +22,28 @@
             --navbar-height: 75px;
         }
 
-        * { * {
+        * {
             box-sizing: border-box;
             font-family: 'Noto Sans TC', sans-serif;
-            -webkit-tap-highlight-color: transparent; /* 取消點擊時的藍色/灰色框框 */
-            user-select: none; /* 禁止選取文字 (像App一樣) */
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
             -webkit-user-select: none;
         }
-        
-        /* 讓輸入框還是可以選取文字，不然家長會生氣 */
+
         input, select, textarea {
             user-select: text;
             -webkit-user-select: text;
-        } }
+        }
+
+        h1, h2, h3, .header-title, .course-title, .page-title-simple, .gallery-intro, .faq-title { font-family: 'Noto Serif TC', serif; }
+        
+        body { 
+            margin: 0; 
+            padding: 0; 
+            background-color: var(--bg-light); 
+            color: var(--text-dark); 
+            padding-bottom: calc(var(--navbar-height) + 100px); 
+        }
 
         /* Loading */
         #loading-mask {
@@ -163,7 +170,21 @@
             <form id="bookingForm" onsubmit="submitBooking(event)">
                 <div style="margin-bottom:15px;"><label style="display:block; margin-bottom:8px; font-weight:bold; color:var(--primary-green);">學生姓名</label><input type="text" id="studentName" placeholder="請輸入姓名" required></div>
                 <div style="margin-bottom:15px;"><label style="display:block; margin-bottom:8px; font-weight:bold; color:var(--primary-green);">Line ID</label><input type="text" id="lineId" placeholder="方便教練聯繫" required></div>
-                <div style="margin-bottom:15px;"><label style="display:block; margin-bottom:8px; font-weight:bold; color:var(--primary-green);">選擇可預約時段</label>
+                
+                <div style="margin-bottom:15px;">
+                    <label style="display:block; margin-bottom:8px; font-weight:bold; color:var(--primary-green);">選擇報名班級</label>
+                    <div class="select-wrapper">
+                        <select id="classType" required style="font-weight:500; color:#333;">
+                            <option value="" disabled selected>請選擇班級</option>
+                            <option value="一對一個別班">一對一個別班</option>
+                            <option value="競技泳隊班">競技泳隊班</option>
+                            <option value="水上救生班">水上救生班</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="margin-bottom:15px;">
+                    <label style="display:block; margin-bottom:8px; font-weight:bold; color:var(--primary-green);">選擇可預約時段</label>
                     <div class="select-wrapper">
                         <select id="bookingSlot" required style="font-weight:500; color:#333;">
                             <option value="" disabled selected>請點擊選擇時段</option>
@@ -232,15 +253,13 @@
         <a href="#" class="nav-item" onclick="switchPage('contact', this)"><i class="far fa-address-card"></i><span class="nav-text">聯絡</span></a>
     </nav>
 
-<script>
+    <script>
         // --- 設定：你的 Google Sheet CSV 連結 ---
         const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vT5uSq5naHmBPqrss4hnmmtrorqYt2LTMw0-NSsLPibD-0a2Y9jAMnQfZYfOLfnZ5o9v9HyGqDr61WB/pub?gid=1138147280&single=true&output=csv';
 
-        // --- V17 資料讀取邏輯 (修復英文空格被切斷的問題) ---
+        // --- 資料讀取邏輯 ---
         async function loadContent() {
             const statusBox = document.querySelector('#loading-mask div:last-child');
-            
-            // 定義三種嘗試連線的策略
             const strategies = [
                 { name: '線路 A', url: `https://api.allorigins.win/raw?url=${encodeURIComponent(CSV_URL)}` },
                 { name: '線路 B', url: `https://corsproxy.io/?${encodeURIComponent(CSV_URL)}` },
@@ -258,9 +277,7 @@
                     
                     if(!text.includes('bg-header')) throw new Error('資料格式有誤');
 
-                    // 解析並套用
                     parseAndApplyData(text);
-                    
                     hideLoading();
                     return; 
 
@@ -272,27 +289,17 @@
             hideLoading();
         }
 
-        // --- V17 核心修正：更聰明的 CSV 解析器 ---
+        // CSV 解析
         function parseAndApplyData(text) {
-            // 1. 先把每一行切開
             const rows = text.split(/\r?\n/);
-
             rows.forEach(row => {
-                if (!row.trim()) return; // 跳過空行
-
-                // 2. 聰明的欄位切割：支援引號與逗號，且不會切斷空格
-                // 這段正則表達式會抓取：被雙引號包住的內容 OR 不包含逗號的內容
+                if (!row.trim()) return;
                 const matches = row.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g);
-                
                 if (!matches || matches.length < 2) return;
-
-                // 去除前後引號與空白
                 const key = matches[0].replace(/^"|"$/g, '').trim();
                 const content = matches[1].replace(/^"|"$/g, '').trim();
-
                 if (!key || !content) return;
 
-                // 3. 更新網頁內容
                 const element = document.getElementById(key);
                 if (element) {
                     if (key.startsWith('img-')) {
@@ -320,7 +327,7 @@
 
         window.addEventListener('DOMContentLoaded', loadContent);
 
-        // --- 其他功能保持不變 ---
+        // --- 頁面切換功能 ---
         function switchPage(pageId, navElement) {
             document.querySelectorAll('.page-container').forEach(page => page.classList.remove('active'));
             const targetId = pageId === 'gallery' ? 'page-gallery' : pageId === 'faq' ? 'page-faq' : 'page-' + pageId;
@@ -349,18 +356,28 @@
             window.scrollTo(0, 0);
         }
 
+        // --- 預約送出功能 (V19: 新增班級欄位) ---
         function submitBooking(event) {
             event.preventDefault();
             const nameInput = document.getElementById('studentName');
             const lineInput = document.getElementById('lineId');
+            const classTypeInput = document.getElementById('classType'); // 新增
             const slotInput = document.getElementById('bookingSlot');
             
-            if(!nameInput.value || !lineInput.value || !slotInput.value) { alert('請完整填寫資料！'); return; }
+            // 驗證是否有選填
+            if(!nameInput.value || !lineInput.value || !slotInput.value || !classTypeInput.value) { 
+                alert('請完整填寫資料（包含班級選擇）！'); 
+                return; 
+            }
+            
             localStorage.setItem('swimStudentName', nameInput.value);
             localStorage.setItem('swimStudentLineId', lineInput.value);
-            const message = `🏊‍♂️ 教練您好，我要預約！%0A------------------%0A學生姓名：${nameInput.value}%0A家長Line：${lineInput.value}%0A預約時段：${slotInput.value}`;
+
+            // 產生 Line 訊息 (包含班級資訊)
+            const message = `🏊‍♂️ 教練您好，我要預約！%0A------------------%0A學生姓名：${nameInput.value}%0A家長Line：${lineInput.value}%0A報名班級：${classTypeInput.value}%0A預約時段：${slotInput.value}`;
             const lineUrl = `https://line.me/R/msg/text/?${message}`;
-            if(confirm(`即將開啟 Line 傳送預約資訊給教練：\n\n學生：${nameInput.value}\n時段：${slotInput.value}`)) {
+
+            if(confirm(`即將開啟 Line 傳送預約資訊給教練：\n\n學生：${nameInput.value}\n班級：${classTypeInput.value}\n時段：${slotInput.value}`)) {
                 window.location.href = lineUrl;
             }
         }
