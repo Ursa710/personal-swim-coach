@@ -174,11 +174,8 @@
                 <div style="margin-bottom:15px;">
                     <label style="display:block; margin-bottom:8px; font-weight:bold; color:var(--primary-green);">選擇報名班級</label>
                     <div class="select-wrapper">
-                        <select id="classType" required style="font-weight:500; color:#333;">
-                            <option value="" disabled selected>請選擇班級</option>
-                            <option value="一對一個別班">一對一個別班</option>
-                            <option value="競技泳隊班">競技泳隊班</option>
-                            <option value="水上救生班">水上救生班</option>
+                        <select id="list-class-types" required style="font-weight:500; color:#333;">
+                            <option value="" disabled selected>載入班級中...</option>
                         </select>
                     </div>
                 </div>
@@ -186,13 +183,8 @@
                 <div style="margin-bottom:15px;">
                     <label style="display:block; margin-bottom:8px; font-weight:bold; color:var(--primary-green);">選擇可預約時段</label>
                     <div class="select-wrapper">
-                        <select id="bookingSlot" required style="font-weight:500; color:#333;">
-                            <option value="" disabled selected>請點擊選擇時段</option>
-                            <optgroup label="本月時段">
-                                <option value="週六 09:00">週六 09:00-10:00</option>
-                                <option value="週六 10:30">週六 10:30-11:30</option>
-                                <option value="週日 14:00">週日 14:00-15:00</option>
-                            </optgroup>
+                        <select id="list-booking-slots" required style="font-weight:500; color:#333;">
+                            <option value="" disabled selected>載入時段中...</option>
                         </select>
                     </div>
                 </div>
@@ -268,9 +260,7 @@
 
             for (let strategy of strategies) {
                 try {
-                    console.log(`嘗試使用 ${strategy.name} 讀取資料...`);
                     if(statusBox) statusBox.innerText = `資料同步中 (${strategy.name})...`;
-
                     const response = await fetch(strategy.url);
                     if (!response.ok) throw new Error(`${strategy.name} 回應錯誤`);
                     const text = await response.text();
@@ -289,7 +279,7 @@
             hideLoading();
         }
 
-        // CSV 解析
+        // --- V20 解析器 (支援動態選單生成) ---
         function parseAndApplyData(text) {
             const rows = text.split(/\r?\n/);
             rows.forEach(row => {
@@ -300,6 +290,28 @@
                 const content = matches[1].replace(/^"|"$/g, '').trim();
                 if (!key || !content) return;
 
+                // 特殊處理：如果是選單資料 (list- 開頭)
+                if (key.startsWith('list-')) {
+                    const selectEl = document.getElementById(key);
+                    if (selectEl) {
+                        // 清空並重建模組
+                        selectEl.innerHTML = '<option value="" disabled selected>請選擇...</option>';
+                        // 支援逗號或頓號分隔
+                        const options = content.split(/,|、/);
+                        options.forEach(optText => {
+                            const cleanText = optText.trim();
+                            if(cleanText) {
+                                const option = document.createElement('option');
+                                option.value = cleanText;
+                                option.innerText = cleanText;
+                                selectEl.appendChild(option);
+                            }
+                        });
+                    }
+                    return;
+                }
+
+                // 一般文字與圖片
                 const element = document.getElementById(key);
                 if (element) {
                     if (key.startsWith('img-')) {
@@ -327,7 +339,7 @@
 
         window.addEventListener('DOMContentLoaded', loadContent);
 
-        // --- 頁面切換功能 ---
+        // --- 其他功能 ---
         function switchPage(pageId, navElement) {
             document.querySelectorAll('.page-container').forEach(page => page.classList.remove('active'));
             const targetId = pageId === 'gallery' ? 'page-gallery' : pageId === 'faq' ? 'page-faq' : 'page-' + pageId;
@@ -356,28 +368,26 @@
             window.scrollTo(0, 0);
         }
 
-        // --- 預約送出功能 (V19: 新增班級欄位) ---
         function submitBooking(event) {
             event.preventDefault();
             const nameInput = document.getElementById('studentName');
             const lineInput = document.getElementById('lineId');
-            const classTypeInput = document.getElementById('classType'); // 新增
-            const slotInput = document.getElementById('bookingSlot');
+            const classInput = document.getElementById('list-class-types'); // V20 新增
+            const slotInput = document.getElementById('list-booking-slots'); // V20 改名
             
-            // 驗證是否有選填
-            if(!nameInput.value || !lineInput.value || !slotInput.value || !classTypeInput.value) { 
-                alert('請完整填寫資料（包含班級選擇）！'); 
+            if(!nameInput.value || !lineInput.value || !classInput.value || !slotInput.value) { 
+                alert('請完整填寫資料（包含班級與時段）！'); 
                 return; 
             }
             
             localStorage.setItem('swimStudentName', nameInput.value);
             localStorage.setItem('swimStudentLineId', lineInput.value);
 
-            // 產生 Line 訊息 (包含班級資訊)
-            const message = `🏊‍♂️ 教練您好，我要預約！%0A------------------%0A學生姓名：${nameInput.value}%0A家長Line：${lineInput.value}%0A報名班級：${classTypeInput.value}%0A預約時段：${slotInput.value}`;
+            // V20: Line 訊息加入班級
+            const message = `🏊‍♂️ 教練您好，我要預約！%0A------------------%0A學生姓名：${nameInput.value}%0A家長Line：${lineInput.value}%0A報名班級：${classInput.value}%0A預約時段：${slotInput.value}`;
             const lineUrl = `https://line.me/R/msg/text/?${message}`;
 
-            if(confirm(`即將開啟 Line 傳送預約資訊給教練：\n\n學生：${nameInput.value}\n班級：${classTypeInput.value}\n時段：${slotInput.value}`)) {
+            if(confirm(`即將開啟 Line 傳送預約資訊給教練：\n\n學生：${nameInput.value}\n班級：${classInput.value}\n時段：${slotInput.value}`)) {
                 window.location.href = lineUrl;
             }
         }
