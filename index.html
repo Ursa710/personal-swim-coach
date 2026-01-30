@@ -217,65 +217,110 @@
         <a href="#" class="nav-item" onclick="switchPage('contact', this)"><i class="far fa-address-card"></i><span class="nav-text">聯絡</span></a>
     </nav>
 
-    <script>
+<script>
         // --- 設定：你的 Google Sheet CSV 連結 ---
+        // 這是你提供的連結，確認無誤
         const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vT5uSq5naHmBPqrss4hnmmtrorqYt2LTMw0-NSsLPibD-0a2Y9jAMnQfZYfOLfnZ5o9v9HyGqDr61WB/pub?gid=1138147280&single=true&output=csv';
 
-        // --- 資料讀取邏輯 (加上 Proxy 解決跨域問題) ---
+        // --- V16 終極強韌版資料讀取邏輯 ---
         async function loadContent() {
-            try {
-                // 使用 allorigins 代理伺服器來繞過 CORS 限制
-                const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(CSV_URL)}`;
-                
-                const response = await fetch(proxyUrl);
-                const text = await response.text();
-                const rows = text.split('\n').map(row => {
-                    const matches = row.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
-                    return matches ? matches.map(m => m.replace(/^"|"$/g, '')) : [];
-                });
+            const statusBox = document.querySelector('#loading-mask div:last-child');
+            
+            // 定義三種嘗試連線的策略
+            const strategies = [
+                {
+                    name: '線路 A',
+                    url: `https://api.allorigins.win/raw?url=${encodeURIComponent(CSV_URL)}`
+                },
+                {
+                    name: '線路 B',
+                    url: `https://corsproxy.io/?${encodeURIComponent(CSV_URL)}`
+                },
+                {
+                    name: '線路 C (直連)',
+                    url: CSV_URL
+                }
+            ];
 
-                rows.slice(1).forEach(row => {
-                    if (row.length < 2) return;
-                    const key = row[0].trim();
-                    const content = row[1] ? row[1].trim() : '';
+            for (let strategy of strategies) {
+                try {
+                    console.log(`嘗試使用 ${strategy.name} 讀取資料...`);
+                    if(statusBox) statusBox.innerText = `資料同步中 (${strategy.name})...`;
 
-                    if (!key || !content) return;
+                    const response = await fetch(strategy.url);
+                    if (!response.ok) throw new Error(`${strategy.name} 回應錯誤`);
+                    
+                    const text = await response.text();
+                    
+                    // 檢查內容是否看起來像正確的 CSV (應該包含 "bg-header" 這樣的關鍵字)
+                    if(!text.includes('bg-header')) throw new Error('讀取到的資料格式不正確');
 
-                    const element = document.getElementById(key);
-                    if (element) {
-                        if (key.startsWith('img-')) {
-                            element.src = content;
-                        } else if (key.startsWith('bg-')) {
-                            element.style.backgroundImage = `url('${content}')`;
-                        } else if (key.startsWith('link-')) {
-                            element.href = content;
-                        } else if (key === 't-coach-bio' || key === 't-faq-intro') {
-                            element.innerHTML = content.replace(/\n/g, '<br>');
-                        } else {
-                            element.innerText = content;
-                        }
+                    // 解析 CSV
+                    parseAndApplyData(text);
+                    
+                    // 成功了！跳出迴圈
+                    console.log(`成功使用 ${strategy.name} 讀取資料！`);
+                    hideLoading();
+                    return; 
+
+                } catch (error) {
+                    console.warn(`${strategy.name} 失敗:`, error);
+                    // 繼續嘗試下一個策略
+                }
+            }
+
+            // 如果全部都失敗
+            alert('⚠️ 無法讀取資料。\n請確認 Google 試算表是否仍為「發布到網路」狀態。');
+            hideLoading();
+        }
+
+        // 解析並套用資料的函式
+        function parseAndApplyData(text) {
+            const rows = text.split('\n').map(row => {
+                const matches = row.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
+                return matches ? matches.map(m => m.replace(/^"|"$/g, '')) : [];
+            });
+
+            rows.slice(1).forEach(row => {
+                if (row.length < 2) return;
+                const key = row[0].trim();
+                const content = row[1] ? row[1].trim() : '';
+
+                if (!key || !content) return;
+
+                const element = document.getElementById(key);
+                if (element) {
+                    if (key.startsWith('img-')) {
+                        element.src = content;
+                    } else if (key.startsWith('bg-')) {
+                        element.style.backgroundImage = `url('${content}')`;
+                    } else if (key.startsWith('link-')) {
+                        element.href = content;
+                    } else if (key === 't-coach-bio' || key === 't-faq-intro') {
+                        element.innerHTML = content.replace(/\n/g, '<br>');
+                    } else {
+                        element.innerText = content;
                     }
-                });
+                }
+            });
+        }
 
-                document.getElementById('loading-mask').style.opacity = '0';
-                setTimeout(() => {
-                    document.getElementById('loading-mask').style.display = 'none';
-                }, 500);
-
-            } catch (error) {
-                console.error('資料讀取失敗:', error);
-                alert('連線失敗，請檢查網路。');
-                document.getElementById('loading-mask').style.display = 'none';
+        function hideLoading() {
+            const mask = document.getElementById('loading-mask');
+            if(mask) {
+                mask.style.opacity = '0';
+                setTimeout(() => { mask.style.display = 'none'; }, 500);
             }
         }
 
         window.addEventListener('DOMContentLoaded', loadContent);
 
-        // --- 其他功能 ---
+        // --- 其他功能 (切換頁面、預約) ---
         function switchPage(pageId, navElement) {
             document.querySelectorAll('.page-container').forEach(page => page.classList.remove('active'));
             const targetId = pageId === 'gallery' ? 'page-gallery' : pageId === 'faq' ? 'page-faq' : 'page-' + pageId;
-            (document.getElementById(targetId) || document.getElementById('page-' + pageId)).classList.add('active');
+            const targetEl = document.getElementById(targetId) || document.getElementById('page-' + pageId);
+            if(targetEl) targetEl.classList.add('active');
             
             document.querySelectorAll('.nav-item').forEach(item => {
                 item.classList.remove('active');
@@ -304,21 +349,21 @@
             const nameInput = document.getElementById('studentName');
             const lineInput = document.getElementById('lineId');
             const slotInput = document.getElementById('bookingSlot');
-            const name = nameInput.value.trim();
-            const lineId = lineInput.value.trim();
-            const selectedSlot = slotInput.value;
             
-            if(!name || !lineId || !selectedSlot) { alert('請完整填寫姓名、Line ID 與選擇時段喔！'); return; }
-            localStorage.setItem('swimStudentName', name);
-            localStorage.setItem('swimStudentLineId', lineId);
-            const message = `🏊‍♂️ 教練您好，我要預約！%0A------------------%0A學生姓名：${name}%0A家長Line：${lineId}%0A預約時段：${selectedSlot}`;
+            if(!nameInput.value || !lineInput.value || !slotInput.value) { alert('請完整填寫資料！'); return; }
+            
+            localStorage.setItem('swimStudentName', nameInput.value);
+            localStorage.setItem('swimStudentLineId', lineInput.value);
+
+            const message = `🏊‍♂️ 教練您好，我要預約！%0A------------------%0A學生姓名：${nameInput.value}%0A家長Line：${lineInput.value}%0A預約時段：${slotInput.value}`;
             const lineUrl = `https://line.me/R/msg/text/?${message}`;
-            if(confirm(`即將開啟 Line 傳送預約資訊給教練：\n\n學生：${name}\n時段：${selectedSlot}\n\n按下「確定」後請在 Line 對話視窗按下傳送鍵！`)) {
+
+            if(confirm(`即將開啟 Line 傳送預約資訊給教練：\n\n學生：${nameInput.value}\n時段：${slotInput.value}`)) {
                 window.location.href = lineUrl;
             }
         }
+
         window.onload = function() {
-            loadContent();
             const savedName = localStorage.getItem('swimStudentName');
             const savedLineId = localStorage.getItem('swimStudentLineId');
             if(savedName) document.getElementById('studentName').value = savedName;
