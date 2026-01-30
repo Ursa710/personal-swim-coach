@@ -234,27 +234,17 @@
 
 <script>
         // --- 設定：你的 Google Sheet CSV 連結 ---
-        // 這是你提供的連結，確認無誤
         const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vT5uSq5naHmBPqrss4hnmmtrorqYt2LTMw0-NSsLPibD-0a2Y9jAMnQfZYfOLfnZ5o9v9HyGqDr61WB/pub?gid=1138147280&single=true&output=csv';
 
-        // --- V16 終極強韌版資料讀取邏輯 ---
+        // --- V17 資料讀取邏輯 (修復英文空格被切斷的問題) ---
         async function loadContent() {
             const statusBox = document.querySelector('#loading-mask div:last-child');
             
             // 定義三種嘗試連線的策略
             const strategies = [
-                {
-                    name: '線路 A',
-                    url: `https://api.allorigins.win/raw?url=${encodeURIComponent(CSV_URL)}`
-                },
-                {
-                    name: '線路 B',
-                    url: `https://corsproxy.io/?${encodeURIComponent(CSV_URL)}`
-                },
-                {
-                    name: '線路 C (直連)',
-                    url: CSV_URL
-                }
+                { name: '線路 A', url: `https://api.allorigins.win/raw?url=${encodeURIComponent(CSV_URL)}` },
+                { name: '線路 B', url: `https://corsproxy.io/?${encodeURIComponent(CSV_URL)}` },
+                { name: '線路 C (直連)', url: CSV_URL }
             ];
 
             for (let strategy of strategies) {
@@ -264,45 +254,45 @@
 
                     const response = await fetch(strategy.url);
                     if (!response.ok) throw new Error(`${strategy.name} 回應錯誤`);
-                    
                     const text = await response.text();
                     
-                    // 檢查內容是否看起來像正確的 CSV (應該包含 "bg-header" 這樣的關鍵字)
-                    if(!text.includes('bg-header')) throw new Error('讀取到的資料格式不正確');
+                    if(!text.includes('bg-header')) throw new Error('資料格式有誤');
 
-                    // 解析 CSV
+                    // 解析並套用
                     parseAndApplyData(text);
                     
-                    // 成功了！跳出迴圈
-                    console.log(`成功使用 ${strategy.name} 讀取資料！`);
                     hideLoading();
                     return; 
 
                 } catch (error) {
                     console.warn(`${strategy.name} 失敗:`, error);
-                    // 繼續嘗試下一個策略
                 }
             }
-
-            // 如果全部都失敗
-            alert('⚠️ 無法讀取資料。\n請確認 Google 試算表是否仍為「發布到網路」狀態。');
+            alert('⚠️ 無法讀取資料，請檢查網路或 Google 試算表設定。');
             hideLoading();
         }
 
-        // 解析並套用資料的函式
+        // --- V17 核心修正：更聰明的 CSV 解析器 ---
         function parseAndApplyData(text) {
-            const rows = text.split('\n').map(row => {
-                const matches = row.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
-                return matches ? matches.map(m => m.replace(/^"|"$/g, '')) : [];
-            });
+            // 1. 先把每一行切開
+            const rows = text.split(/\r?\n/);
 
-            rows.slice(1).forEach(row => {
-                if (row.length < 2) return;
-                const key = row[0].trim();
-                const content = row[1] ? row[1].trim() : '';
+            rows.forEach(row => {
+                if (!row.trim()) return; // 跳過空行
+
+                // 2. 聰明的欄位切割：支援引號與逗號，且不會切斷空格
+                // 這段正則表達式會抓取：被雙引號包住的內容 OR 不包含逗號的內容
+                const matches = row.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g);
+                
+                if (!matches || matches.length < 2) return;
+
+                // 去除前後引號與空白
+                const key = matches[0].replace(/^"|"$/g, '').trim();
+                const content = matches[1].replace(/^"|"$/g, '').trim();
 
                 if (!key || !content) return;
 
+                // 3. 更新網頁內容
                 const element = document.getElementById(key);
                 if (element) {
                     if (key.startsWith('img-')) {
@@ -330,7 +320,7 @@
 
         window.addEventListener('DOMContentLoaded', loadContent);
 
-        // --- 其他功能 (切換頁面、預約) ---
+        // --- 其他功能保持不變 ---
         function switchPage(pageId, navElement) {
             document.querySelectorAll('.page-container').forEach(page => page.classList.remove('active'));
             const targetId = pageId === 'gallery' ? 'page-gallery' : pageId === 'faq' ? 'page-faq' : 'page-' + pageId;
@@ -366,13 +356,10 @@
             const slotInput = document.getElementById('bookingSlot');
             
             if(!nameInput.value || !lineInput.value || !slotInput.value) { alert('請完整填寫資料！'); return; }
-            
             localStorage.setItem('swimStudentName', nameInput.value);
             localStorage.setItem('swimStudentLineId', lineInput.value);
-
             const message = `🏊‍♂️ 教練您好，我要預約！%0A------------------%0A學生姓名：${nameInput.value}%0A家長Line：${lineInput.value}%0A預約時段：${slotInput.value}`;
             const lineUrl = `https://line.me/R/msg/text/?${message}`;
-
             if(confirm(`即將開啟 Line 傳送預約資訊給教練：\n\n學生：${nameInput.value}\n時段：${slotInput.value}`)) {
                 window.location.href = lineUrl;
             }
