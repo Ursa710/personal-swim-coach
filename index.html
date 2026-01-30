@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>你的專屬游泳教練</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;600;900&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <style>
+        /* --- 核心變數 --- */
+        :root {
+            --primary-green: #4F736D; 
+            --secondary-green: #8DA9A3; 
+            --accent-orange: #E68A73; 
+            --bg-light: #F7F9F9;
+            --text-dark: #2C3E3C;
+            --white: #FFFFFF;
+            --navbar-height: 75px;
+        }
+
+        * { box-sizing: border-box; font-family: 'Noto Sans TC', sans-serif; -webkit-tap-highlight-color: transparent; }
+        h1, h2, h3, .header-title, .course-title, .page-title-simple, .gallery-intro, .faq-title { font-family: 'Noto Serif TC', serif; }
+        body { margin: 0; padding: 0; background-color: var(--bg-light); color: var(--text-dark); padding-bottom: calc(var(--navbar-height) + 30px); }
+
+        /* Loading */
+        #loading-mask {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #fff; z-index: 9999;
+            display: flex; justify-content: center; align-items: center;
+            flex-direction: column; transition: opacity 0.5s;
+        }
+        .spinner { width: 40px; height: 40px; border: 4px solid #eee; border-top: 4px solid var(--primary-green); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 10px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Header */
+        .water-header { position: relative; height: 420px; overflow: hidden; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; background-color: var(--primary-green); }
+        .water-bg {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background-size: cover; background-position: center; z-index: 1;
+            transform: scale(1.1); filter: blur(6px); transition: background-image 0.5s ease;
+            mask-image: linear-gradient(to bottom, black 70%, transparent 100%);
+            -webkit-mask-image: linear-gradient(to bottom, black 70%, transparent 100%);
+        }
+        .header-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(30, 50, 47, 0.5) 0%, rgba(30, 50, 47, 0.85) 100%); z-index: 2; }
+        .shimmer-overlay { position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%); z-index: 3; opacity: 0.5; animation: waterRipple 18s infinite linear; mix-blend-mode: overlay; }
+        @keyframes waterRipple { 0% { transform: rotate(0deg) translate(0, 0); } 50% { transform: rotate(180deg) translate(20px, 20px); } 100% { transform: rotate(360deg) translate(0, 0); } }
+        .header-content { position: relative; z-index: 4; color: white; padding: 20px 10px; margin-top: 10px; display: flex; flex-direction: column; align-items: center; width: 100%; }
+        .header-eng { font-size: 0.8rem; letter-spacing: 5px; font-weight: 500; opacity: 0.9; margin-bottom: 15px; font-family: sans-serif; text-transform: uppercase; text-shadow: 0 2px 10px rgba(0,0,0,0.3); }
+        .header-title { font-size: clamp(2rem, 8vw, 2.8rem); margin-bottom: 25px; font-weight: 900; letter-spacing: 2px; text-shadow: 0 5px 25px rgba(0,0,0,0.5); white-space: nowrap; }
+        .header-subtitle-capsule { font-size: 1.05rem; font-weight: 500; letter-spacing: 1.5px; color: #fff; background: rgba(255, 255, 255, 0.15); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); padding: 10px 28px; border-radius: 50px; border: 1px solid rgba(255, 255, 255, 0.4); box-shadow: 0 4px 15px rgba(0,0,0,0.2); text-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+
+        .content-wrapper { position: relative; z-index: 10; margin-top: -60px; padding: 0 20px; }
+        .page-container { display: none; max-width: 600px; margin: 0 auto; animation: fadeIn 0.4s ease; }
+        .page-container.active { display: block; }
+        .page-container:not(#page-course) { padding: 30px 20px 0 20px; }
+        .page-title-simple { text-align: center; color: var(--primary-green); font-size: 1.8rem; margin-bottom: 10px; font-weight: 900; }
+        .card { background: var(--white); border-radius: 24px; padding: 25px; margin-bottom: 25px; box-shadow: 0 15px 35px rgba(141, 169, 163, 0.12); border: 1px solid rgba(255,255,255,0.6); }
+        .course-img { width: 100%; height: 180px; border-radius: 18px; margin-bottom: 20px; object-fit: cover; box-shadow: 0 5px 15px rgba(0,0,0,0.08); }
+        .course-title { font-size: 1.4rem; color: var(--primary-green); margin-bottom: 10px; font-weight: 900; }
+        .course-desc { font-size: 0.95rem; color: #555; line-height: 1.7; }
+
+        .gallery-intro { text-align: center; margin-bottom: 30px; color: #666; font-size: 1rem; line-height: 1.6; }
+        .gallery-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
+        .gallery-item { position: relative; border-radius: 16px; overflow: hidden; box-shadow: 0 8px 20px rgba(79, 115, 109, 0.1); border: 3px solid white; background: white; }
+        .gallery-item.tall { grid-row: span 2; }
+        .gallery-img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 0.6s ease; }
+        .gallery-caption-bar { position: absolute; bottom: 0; left: 0; width: 100%; background: rgba(44, 62, 60, 0.85); color: white; padding: 8px 10px; font-size: 0.75rem; font-weight: 500; text-align: center; backdrop-filter: blur(2px); }
+
+        .cta-box-slim { display: flex; align-items: center; justify-content: space-between; margin-top: 30px; padding: 15px 25px; background: var(--primary-green); border-radius: 50px; box-shadow: 0 10px 25px rgba(79, 115, 109, 0.25); color: white; }
+        .cta-text-group { display: flex; flex-direction: column; text-align: left; }
+        .cta-title-slim { font-size: 1.05rem; font-weight: 900; margin-bottom: 2px; font-family: 'Noto Serif TC', serif; letter-spacing: 0.5px; }
+        .cta-desc-slim { font-size: 0.75rem; opacity: 0.85; font-weight: 400; }
+        .btn-cta-pop { width: auto; padding: 10px 22px; background-color: var(--accent-orange); color: white; border: none; border-radius: 30px; font-size: 0.95rem; font-weight: bold; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.2); white-space: nowrap; margin-left: 15px; transition: transform 0.1s; }
+        .btn-cta-pop:active { transform: scale(0.95); }
+
+        details { border-bottom: 1px solid #eee; padding: 12px 0; }
+        details:last-child { border-bottom: none; }
+        summary { font-weight: bold; color: var(--text-dark); cursor: pointer; list-style: none; display: flex; align-items: center; justify-content: space-between; }
+        summary::-webkit-details-marker { display: none; }
+        summary:after { content: '\f078'; font-family: 'Font Awesome 6 Free'; font-weight: 900; color: var(--secondary-green); transition: transform 0.3s; }
+        details[open] summary:after { transform: rotate(180deg); color: var(--primary-green); }
+        details[open] summary { color: var(--primary-green); margin-bottom: 8px; }
+        .faq-answer { font-size: 0.9rem; color: #666; line-height: 1.6; padding-right: 10px; }
+
+        input, select { width: 100%; padding: 15px; border: 2px solid #E0E0E0; border-radius: 15px; font-size: 1rem; outline: none; background: #FAFAFA; transition: all 0.3s; appearance: none; -webkit-appearance: none; }
+        .select-wrapper { position: relative; }
+        .select-wrapper::after { content: '\f078'; font-family: 'Font Awesome 6 Free'; font-weight: 900; position: absolute; right: 15px; top: 50%; transform: translateY(-50%); color: var(--primary-green); pointer-events: none; }
+        input:focus, select:focus { border-color: var(--primary-green); background: #fff; box-shadow: 0 0 0 4px rgba(79, 115, 109, 0.1); }
+        .btn-submit { width: 100%; padding: 16px; background-color: var(--primary-green); color: white; border: none; border-radius: 50px; font-size: 1.1rem; font-weight: bold; cursor: pointer; margin-top: 15px; box-shadow: 0 8px 20px rgba(79, 115, 109, 0.25); transition: transform 0.1s; }
+        .btn-submit:active { transform: scale(0.98); }
+        
+        .navbar-container { position: fixed; bottom: 25px; left: 50%; transform: translateX(-50%); width: 92%; max-width: 420px; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); height: var(--navbar-height); border-radius: 40px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 10px 30px rgba(0,0,0,0.1); z-index: 100; padding: 5px 15px; border: 1px solid rgba(255,255,255,0.5); }
+        .nav-item { display: flex; flex-direction: column; align-items: center; justify-content: center; text-decoration: none; color: #A0A0A0; flex: 1; height: 100%; border-radius: 20px; transition: all 0.3s ease; padding: 5px 0; }
+        .nav-item i { font-size: 1.35rem; margin-bottom: 4px; transition: transform 0.3s; }
+        .nav-text { font-size: 0.7rem; font-weight: 500; }
+        .nav-item.active { color: var(--primary-green); background-color: rgba(79, 115, 109, 0.05); }
+        .nav-item.active i { transform: translateY(-2px); }
+        .avatar { width: 140px; height: 140px; border-radius: 50%; border: 6px solid white; box-shadow: 0 10px 25px rgba(0,0,0,0.1); object-fit: cover; margin-bottom: 15px; }
+        .contact-btn { display: flex; align-items: center; justify-content: center; width: 100%; padding: 16px; margin-bottom: 12px; border-radius: 15px; text-decoration: none; color: white; font-weight: bold; box-shadow: 0 5px 15px rgba(0,0,0,0.1); transition: opacity 0.3s; }
+        .contact-btn:hover { opacity: 0.9; }
+        .btn-phone { background-color: var(--primary-green); }
+        .btn-line { background-color: #06C755; }
+        .btn-ig { background: linear-gradient(45deg, #f09433 0%,#e6683c 25%,#dc2743 50%,#cc2366 75%,#bc1888 100%); }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+
+    <div id="loading-mask">
+        <div class="spinner"></div>
+        <div style="color:#666; font-size:0.9rem;">資料同步中...</div>
+    </div>
+
+    <div id="page-course" class="page-container active" style="padding: 0; max-width: 100%;">
+        <header class="water-header">
+            <div class="water-bg" id="bg-header"></div>
+            <div class="header-overlay"></div><div class="shimmer-overlay"></div>
+            <div class="header-content">
+                <div class="header-eng" id="t-header-eng">Personal Swimming Coach</div>
+                <div class="header-title" id="t-header-title">你的專屬游泳教練</div>
+                <div class="header-subtitle-capsule" id="t-header-sub">為你量身定做專屬的學習節奏</div>
+            </div>
+        </header>
+
+        <div class="content-wrapper">
+            <div class="card">
+                <img src="" class="course-img" id="img-course-1">
+                <div class="course-title" id="t-course-title-1">一對一個別班</div>
+                <div class="course-desc" id="t-course-desc-1">課程介紹載入中...</div>
+            </div>
+            <div class="card">
+                <img src="" class="course-img" id="img-course-2">
+                <div class="course-title" id="t-course-title-2">競技泳隊班</div>
+                <div class="course-desc" id="t-course-desc-2">課程介紹載入中...</div>
+            </div>
+            <div class="card">
+                <img src="" class="course-img" id="img-course-3">
+                <div class="course-title" id="t-course-title-3">水上救生班</div>
+                <div class="course-desc" id="t-course-desc-3">課程介紹載入中...</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="page-booking" class="page-container">
+        <h2 class="page-title-simple" id="t-page-booking">預約課程</h2>
+        <div class="card">
+            <form id="bookingForm" onsubmit="submitBooking(event)">
+                <div style="margin-bottom:15px;"><label style="display:block; margin-bottom:8px; font-weight:bold; color:var(--primary-green);">學生姓名</label><input type="text" id="studentName" placeholder="請輸入姓名" required></div>
+                <div style="margin-bottom:15px;"><label style="display:block; margin-bottom:8px; font-weight:bold; color:var(--primary-green);">Line ID</label><input type="text" id="lineId" placeholder="方便教練聯繫" required></div>
+                <div style="margin-bottom:15px;"><label style="display:block; margin-bottom:8px; font-weight:bold; color:var(--primary-green);">選擇可預約時段</label>
+                    <div class="select-wrapper">
+                        <select id="bookingSlot" required style="font-weight:500; color:#333;">
+                            <option value="" disabled selected>請點擊選擇時段</option>
+                            <optgroup label="本月時段">
+                                <option value="週六 09:00">週六 09:00-10:00</option>
+                                <option value="週六 10:30">週六 10:30-11:30</option>
+                                <option value="週日 14:00">週日 14:00-15:00</option>
+                            </optgroup>
+                        </select>
+                    </div>
+                </div>
+                <button type="submit" class="btn-submit"><i class="fab fa-line" style="margin-right:5px;"></i> 送出預約 (自動傳訊)</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="page-faq" class="page-container">
+        <h2 class="page-title-simple" id="t-page-faq">常見問題</h2>
+        <div class="card">
+            <h3 class="faq-title" id="t-faq-intro" style="color:var(--primary-green); margin-top:0; font-size:1.1rem; margin-bottom:20px; line-height:1.5;">有任何疑問嗎？</h3>
+            
+            <details><summary id="t-faq-q1">問題1載入中...</summary><div class="faq-answer" id="t-faq-a1">...</div></details>
+            <details><summary id="t-faq-q2">問題2載入中...</summary><div class="faq-answer" id="t-faq-a2">...</div></details>
+            <details><summary id="t-faq-q3">問題3載入中...</summary><div class="faq-answer" id="t-faq-a3">...</div></details>
+            <details><summary id="t-faq-q4">問題4載入中...</summary><div class="faq-answer" id="t-faq-a4">...</div></details>
+        </div>
+    </div>
+
+    <div id="page-gallery" class="page-container">
+        <h2 class="page-title-simple" id="t-page-gallery">精選花絮</h2>
+        <div class="gallery-intro" id="t-gallery-intro">記錄每一個瞬間...</div>
+        <div class="gallery-grid">
+            <div class="gallery-item"><img src="" class="gallery-img" id="img-gallery-1"><div class="gallery-caption-bar" id="t-gallery-cap-1">...</div></div>
+            <div class="gallery-item"><img src="" class="gallery-img" id="img-gallery-2"><div class="gallery-caption-bar" id="t-gallery-cap-2">...</div></div>
+            <div class="gallery-item tall" style="height: 280px;"><img src="" class="gallery-img" id="img-gallery-3"><div class="gallery-caption-bar" id="t-gallery-cap-3">...</div></div>
+            <div class="gallery-item"><img src="" class="gallery-img" id="img-gallery-4"><div class="gallery-caption-bar" id="t-gallery-cap-4">...</div></div>
+            <div class="gallery-item" style="background: #E0F2F1; display:flex; align-items:center; justify-content:center;"><div style="text-align:center; color:var(--primary-green); padding:15px;"><i class="fas fa-camera" style="font-size:1.8rem; margin-bottom:8px;"></i><div style="font-size:0.8rem; font-weight:bold;">更多精彩<br>持續更新中</div></div></div>
+        </div>
+        <div class="cta-box-slim">
+            <div class="cta-text-group"><div class="cta-title-slim" id="t-cta-title">讓孩子也能在水中發光</div><div class="cta-desc-slim" id="t-cta-desc">歡迎預約體驗課程</div></div>
+            <button onclick="switchPage('booking')" class="btn-cta-pop">前往預約</button>
+        </div>
+    </div>
+
+    <div id="page-contact" class="page-container">
+        <h2 class="page-title-simple">聯絡資訊</h2>
+        <div class="card" style="text-align: center; padding-top:40px;">
+            <img src="" class="avatar" id="img-avatar" alt="陳暉教練">
+            <div style="font-size: 1.8rem; font-weight: 900; margin-bottom: 8px; color:var(--primary-green);" id="t-coach-name">陳暉教練</div>
+            <div style="color:#888; font-size:1rem; font-weight:500;" id="t-coach-title">專業游泳教學</div>
+            <hr style="border:0; border-top:2px dashed #eee; margin:25px 0;">
+            <div style="text-align:left; line-height:2; color:#555; display:inline-block;" id="t-coach-bio">
+                <p>載入中...</p>
+            </div>
+        </div>
+        <a href="" class="contact-btn btn-phone" id="link-phone"><i class="fas fa-phone-alt" style="margin-right:10px; font-size:1.2rem;"></i> 撥打手機號碼</a>
+        <a href="" target="_blank" class="contact-btn btn-line" id="link-line"><i class="fab fa-line" style="margin-right:10px; font-size:1.4rem;"></i> 加入 Line 好友</a>
+        <a href="" target="_blank" class="contact-btn btn-ig" id="link-ig"><i class="fab fa-instagram" style="margin-right:10px; font-size:1.4rem;"></i> 追蹤 Instagram</a>
+    </div>
+
+    <nav class="navbar-container">
+        <a href="#" class="nav-item active" onclick="switchPage('course', this)"><i class="fas fa-swimmer"></i><span class="nav-text">課程</span></a>
+        <a href="#" class="nav-item" onclick="switchPage('booking', this)"><i class="far fa-calendar-check"></i><span class="nav-text">預約</span></a>
+        <a href="#" class="nav-item" onclick="switchPage('faq', this)"><i class="far fa-question-circle"></i><span class="nav-text">問答</span></a>
+        <a href="#" class="nav-item" onclick="switchPage('gallery', this)"><i class="fas fa-camera"></i><span class="nav-text">花絮</span></a>
+        <a href="#" class="nav-item" onclick="switchPage('contact', this)"><i class="far fa-address-card"></i><span class="nav-text">聯絡</span></a>
+    </nav>
+
+    <script>
+        // --- 設定：你的 Google Sheet CSV 連結 ---
+        const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vT5uSq5naHmBPqrss4hnmmtrorqYt2LTMw0-NSsLPibD-0a2Y9jAMnQfZYfOLfnZ5o9v9HyGqDr61WB/pub?gid=1138147280&single=true&output=csv';
+
+        // --- 資料讀取邏輯 (加上 Proxy 解決跨域問題) ---
+        async function loadContent() {
+            try {
+                // 使用 allorigins 代理伺服器來繞過 CORS 限制
+                const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(CSV_URL)}`;
+                
+                const response = await fetch(proxyUrl);
+                const text = await response.text();
+                const rows = text.split('\n').map(row => {
+                    const matches = row.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
+                    return matches ? matches.map(m => m.replace(/^"|"$/g, '')) : [];
+                });
+
+                rows.slice(1).forEach(row => {
+                    if (row.length < 2) return;
+                    const key = row[0].trim();
+                    const content = row[1] ? row[1].trim() : '';
+
+                    if (!key || !content) return;
+
+                    const element = document.getElementById(key);
+                    if (element) {
+                        if (key.startsWith('img-')) {
+                            element.src = content;
+                        } else if (key.startsWith('bg-')) {
+                            element.style.backgroundImage = `url('${content}')`;
+                        } else if (key.startsWith('link-')) {
+                            element.href = content;
+                        } else if (key === 't-coach-bio' || key === 't-faq-intro') {
+                            element.innerHTML = content.replace(/\n/g, '<br>');
+                        } else {
+                            element.innerText = content;
+                        }
+                    }
+                });
+
+                document.getElementById('loading-mask').style.opacity = '0';
+                setTimeout(() => {
+                    document.getElementById('loading-mask').style.display = 'none';
+                }, 500);
+
+            } catch (error) {
+                console.error('資料讀取失敗:', error);
+                alert('連線失敗，請檢查網路。');
+                document.getElementById('loading-mask').style.display = 'none';
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', loadContent);
+
+        // --- 其他功能 ---
+        function switchPage(pageId, navElement) {
+            document.querySelectorAll('.page-container').forEach(page => page.classList.remove('active'));
+            const targetId = pageId === 'gallery' ? 'page-gallery' : pageId === 'faq' ? 'page-faq' : 'page-' + pageId;
+            (document.getElementById(targetId) || document.getElementById('page-' + pageId)).classList.add('active');
+            
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active');
+                const icon = item.querySelector('i');
+                if (icon.classList.contains('fa-calendar-check')) icon.classList.replace('fas', 'far');
+                if (icon.classList.contains('fa-address-card')) icon.classList.replace('fas', 'far');
+                if (icon.classList.contains('fa-question-circle')) icon.classList.replace('fas', 'far');
+            });
+
+            if(navElement) {
+                navElement.classList.add('active');
+                const icon = navElement.querySelector('i');
+                if (icon.classList.contains('fa-calendar-check')) icon.classList.replace('far', 'fas');
+                if (icon.classList.contains('fa-address-card')) icon.classList.replace('far', 'fas');
+                if (icon.classList.contains('fa-question-circle')) icon.classList.replace('far', 'fas');
+            } else if(pageId === 'booking') {
+                const navItems = document.querySelectorAll('.nav-item');
+                navItems[1].classList.add('active');
+                navItems[1].querySelector('i').classList.replace('far', 'fas');
+            }
+            window.scrollTo(0, 0);
+        }
+
+        function submitBooking(event) {
+            event.preventDefault();
+            const nameInput = document.getElementById('studentName');
+            const lineInput = document.getElementById('lineId');
+            const slotInput = document.getElementById('bookingSlot');
+            const name = nameInput.value.trim();
+            const lineId = lineInput.value.trim();
+            const selectedSlot = slotInput.value;
+            
+            if(!name || !lineId || !selectedSlot) { alert('請完整填寫姓名、Line ID 與選擇時段喔！'); return; }
+            localStorage.setItem('swimStudentName', name);
+            localStorage.setItem('swimStudentLineId', lineId);
+            const message = `🏊‍♂️ 教練您好，我要預約！%0A------------------%0A學生姓名：${name}%0A家長Line：${lineId}%0A預約時段：${selectedSlot}`;
+            const lineUrl = `https://line.me/R/msg/text/?${message}`;
+            if(confirm(`即將開啟 Line 傳送預約資訊給教練：\n\n學生：${name}\n時段：${selectedSlot}\n\n按下「確定」後請在 Line 對話視窗按下傳送鍵！`)) {
+                window.location.href = lineUrl;
+            }
+        }
+        window.onload = function() {
+            loadContent();
+            const savedName = localStorage.getItem('swimStudentName');
+            const savedLineId = localStorage.getItem('swimStudentLineId');
+            if(savedName) document.getElementById('studentName').value = savedName;
+            if(savedLineId) document.getElementById('lineId').value = savedLineId;
+        }
+    </script>
+</body>
+</html>
