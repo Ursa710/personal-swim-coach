@@ -4,6 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>你的專屬游泳教練</title>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="format-detection" content="telephone=no">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3135/3135715.png">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;600;900&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
     
@@ -19,9 +24,19 @@
             --navbar-height: 75px;
         }
 
-        * { box-sizing: border-box; font-family: 'Noto Sans TC', sans-serif; -webkit-tap-highlight-color: transparent; }
-        h1, h2, h3, .header-title, .course-title, .page-title-simple, .gallery-intro, .faq-title { font-family: 'Noto Serif TC', serif; }
-        body { margin: 0; padding: 0; background-color: var(--bg-light); color: var(--text-dark); padding-bottom: calc(var(--navbar-height) + 30px); }
+        * { * {
+            box-sizing: border-box;
+            font-family: 'Noto Sans TC', sans-serif;
+            -webkit-tap-highlight-color: transparent; /* 取消點擊時的藍色/灰色框框 */
+            user-select: none; /* 禁止選取文字 (像App一樣) */
+            -webkit-user-select: none;
+        }
+        
+        /* 讓輸入框還是可以選取文字，不然家長會生氣 */
+        input, select, textarea {
+            user-select: text;
+            -webkit-user-select: text;
+        } }
 
         /* Loading */
         #loading-mask {
