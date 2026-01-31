@@ -7,6 +7,12 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="format-detection" content="telephone=no">
     <title>你的專屬游泳教練</title>
+    
+    <link rel="icon" href="https://cdn-icons-png.flaticon.com/512/2906/2906496.png" type="image/png">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2906/2906496.png">
+    
+    <link rel="manifest" href="manifest.json">
+
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;600;900&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
     
@@ -113,27 +119,10 @@
         .btn-submit:active { transform: scale(0.98); }
         
         /* V23: 專業經歷列表樣式 */
-        .bio-container {
-            display: inline-block;
-            text-align: left; /* 強制文字靠左 */
-            width: 100%;
-        }
-        .bio-item {
-            display: flex;
-            align-items: flex-start;
-            margin-bottom: 10px; /* 縮小行距 */
-            line-height: 1.5;
-            font-size: 0.95rem;
-            color: #444;
-        }
+        .bio-container { display: inline-block; text-align: left; width: 100%; }
+        .bio-item { display: flex; align-items: flex-start; margin-bottom: 10px; line-height: 1.5; font-size: 0.95rem; color: #444; }
         .bio-item:last-child { margin-bottom: 0; }
-        .bio-icon {
-            color: var(--primary-green);
-            margin-right: 10px;
-            margin-top: 4px; /* 對齊文字頂端 */
-            flex-shrink: 0;
-            font-size: 0.9rem;
-        }
+        .bio-icon { color: var(--primary-green); margin-right: 10px; margin-top: 4px; flex-shrink: 0; font-size: 0.9rem; }
 
         .navbar-container { position: fixed; bottom: 25px; left: 50%; transform: translateX(-50%); width: 92%; max-width: 420px; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); height: var(--navbar-height); border-radius: 40px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 10px 30px rgba(0,0,0,0.1); z-index: 100; padding: 5px 15px; border: 1px solid rgba(255,255,255,0.5); }
         .nav-item { display: flex; flex-direction: column; align-items: center; justify-content: center; text-decoration: none; color: #A0A0A0; flex: 1; height: 100%; border-radius: 20px; transition: all 0.3s ease; padding: 5px 0; }
@@ -192,7 +181,7 @@
         <div class="card">
             <form id="bookingForm" onsubmit="submitBooking(event)">
                 <div style="margin-bottom:15px;"><label style="display:block; margin-bottom:8px; font-weight:bold; color:var(--primary-green);">學生姓名</label><input type="text" id="studentName" placeholder="請輸入姓名" required></div>
-                <div style="margin-bottom:15px;"><label style="display:block; margin-bottom:8px; font-weight:bold; color:var(--primary-green);">家長聯絡電話或LINE ID</label><input type="text" id="lineId" placeholder="方便教練聯繫" required></div>
+                <div style="margin-bottom:15px;"><label style="display:block; margin-bottom:8px; font-weight:bold; color:var(--primary-green);">Line ID</label><input type="text" id="lineId" placeholder="方便教練聯繫" required></div>
                 
                 <div style="margin-bottom:15px;">
                     <label style="display:block; margin-bottom:8px; font-weight:bold; color:var(--primary-green);">選擇報名班級</label>
@@ -270,22 +259,18 @@
         <a href="#" class="nav-item" onclick="switchPage('contact', this)"><i class="far fa-address-card"></i><span class="nav-text">聯絡</span></a>
     </nav>
 
-<script>
-        // --- 設定：你的 Google Sheet CSV 連結 ---
+    <script>
         const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vT5uSq5naHmBPqrss4hnmmtrorqYt2LTMw0-NSsLPibD-0a2Y9jAMnQfZYfOLfnZ5o9v9HyGqDr61WB/pub?gid=1138147280&single=true&output=csv';
 
-        // --- V25 極速版資料讀取 (採用並行競速邏輯) ---
         async function loadContent(isAutoRefresh = false) {
             const statusBox = document.querySelector('#loading-mask div:last-child');
             if (!isAutoRefresh) {
                 const mask = document.getElementById('loading-mask');
                 if(mask) { mask.style.display = 'flex'; mask.style.opacity = '1'; }
             }
-
             const timestamp = new Date().getTime();
             const freshUrl = `${CSV_URL}&t=${timestamp}`;
 
-            // 定義策略：這次把比較快的 CorsProxy 放前面，並且同時啟動
             const strategies = [
                 { name: '高速線路', url: `https://corsproxy.io/?${encodeURIComponent(freshUrl)}` },
                 { name: '備用線路', url: `https://api.allorigins.win/raw?url=${encodeURIComponent(freshUrl)}` },
@@ -294,8 +279,6 @@
 
             try {
                 if(!isAutoRefresh && statusBox) statusBox.innerText = `資料同步中...`;
-
-                // V25 核心：使用 Promise.any 進行競速，誰先成功就用誰，不用傻傻等
                 const fetchPromise = (strategy) => 
                     fetch(strategy.url)
                         .then(async response => {
@@ -304,16 +287,10 @@
                             if(!text.includes('bg-header')) throw new Error('Invalid data');
                             return text;
                         });
-
-                // 同時發射所有請求
                 const text = await Promise.any(strategies.map(s => fetchPromise(s)));
-
-                // 成功抓到資料
                 parseAndApplyData(text);
-                
                 if (!isAutoRefresh) hideLoading();
                 console.log(`資料極速同步成功`);
-
             } catch (error) {
                 console.error('所有線路皆失敗', error);
                 if (!isAutoRefresh) {
@@ -323,14 +300,10 @@
             }
         }
 
-        // --- 監聽頁面切換 (自動更新) ---
         document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'visible') {
-                loadContent(true);
-            }
+            if (document.visibilityState === 'visible') loadContent(true);
         });
 
-        // --- V23 專業 CSV 解析 ---
         function parseCSV(text) {
             const result = [];
             let currentRow = [];
@@ -340,9 +313,7 @@
                 const char = text[i];
                 const nextChar = text[i + 1];
                 if (char === '"') {
-                    if (inQuotes && nextChar === '"') {
-                        currentCell += '"'; i++;
-                    } else { inQuotes = !inQuotes; }
+                    if (inQuotes && nextChar === '"') { currentCell += '"'; i++; } else { inQuotes = !inQuotes; }
                 } else if (char === ',' && !inQuotes) {
                     currentRow.push(currentCell); currentCell = '';
                 } else if ((char === '\r' || char === '\n') && !inQuotes) {
@@ -362,7 +333,6 @@
                 const content = row[1] ? row[1].trim() : '';
                 if (!key || !content) return;
 
-                // 下拉選單 (記住選擇狀態)
                 if (key.startsWith('list-')) {
                     const selectEl = document.getElementById(key);
                     if (selectEl) {
@@ -378,7 +348,6 @@
                             }
                         });
                         if(currentVal) {
-                            // 檢查原本選的值還在不在新的清單裡
                              const exists = Array.from(selectEl.options).some(o => o.value === currentVal);
                              if(exists) selectEl.value = currentVal;
                         }
@@ -386,7 +355,6 @@
                     return;
                 }
 
-                // 教練經歷 (自動排版)
                 if (key === 't-coach-bio') {
                     const bioEl = document.getElementById(key);
                     if (bioEl) {
@@ -402,7 +370,6 @@
                     return;
                 }
 
-                // 一般內容
                 const element = document.getElementById(key);
                 if (element) {
                     if (key.startsWith('img-')) {
@@ -427,17 +394,12 @@
                 setTimeout(() => { mask.style.display = 'none'; }, 500);
             }
         }
-
-        // 第一次載入
         window.addEventListener('DOMContentLoaded', () => loadContent(false));
-
-        // --- 頁面功能保持不變 ---
         function switchPage(pageId, navElement) {
             document.querySelectorAll('.page-container').forEach(page => page.classList.remove('active'));
             const targetId = pageId === 'gallery' ? 'page-gallery' : pageId === 'faq' ? 'page-faq' : 'page-' + pageId;
             const targetEl = document.getElementById(targetId) || document.getElementById('page-' + pageId);
             if(targetEl) targetEl.classList.add('active');
-            
             document.querySelectorAll('.nav-item').forEach(item => {
                 item.classList.remove('active');
                 const icon = item.querySelector('i');
@@ -445,7 +407,6 @@
                 if (icon.classList.contains('fa-address-card')) icon.classList.replace('fas', 'far');
                 if (icon.classList.contains('fa-question-circle')) icon.classList.replace('fas', 'far');
             });
-
             if(navElement) {
                 navElement.classList.add('active');
                 const icon = navElement.querySelector('i');
@@ -459,27 +420,19 @@
             }
             window.scrollTo(0, 0);
         }
-
         function submitBooking(event) {
             event.preventDefault();
             const nameInput = document.getElementById('studentName');
             const lineInput = document.getElementById('lineId');
             const classInput = document.getElementById('list-class-types');
             const slotInput = document.getElementById('list-booking-slots');
-            
-            if(!nameInput.value || !lineInput.value || !classInput.value || !slotInput.value) { 
-                alert('請完整填寫資料（包含班級與時段）！'); 
-                return; 
-            }
+            if(!nameInput.value || !lineInput.value || !classInput.value || !slotInput.value) { alert('請完整填寫資料！'); return; }
             localStorage.setItem('swimStudentName', nameInput.value);
             localStorage.setItem('swimStudentLineId', lineInput.value);
             const message = `🏊‍♂️ 教練您好，我要預約！%0A------------------%0A學生姓名：${nameInput.value}%0A家長Line：${lineInput.value}%0A報名班級：${classInput.value}%0A預約時段：${slotInput.value}`;
             const lineUrl = `https://line.me/R/msg/text/?${message}`;
-            if(confirm(`即將開啟 Line 傳送預約資訊給教練：\n\n學生：${nameInput.value}\n班級：${classInput.value}\n時段：${slotInput.value}`)) {
-                window.location.href = lineUrl;
-            }
+            if(confirm(`即將開啟 Line 傳送預約資訊給教練：\n\n學生：${nameInput.value}\n班級：${classInput.value}\n時段：${slotInput.value}`)) { window.location.href = lineUrl; }
         }
-
         window.onload = function() {
             const savedName = localStorage.getItem('swimStudentName');
             const savedLineId = localStorage.getItem('swimStudentLineId');
