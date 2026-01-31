@@ -270,13 +270,19 @@
         <a href="#" class="nav-item" onclick="switchPage('contact', this)"><i class="far fa-address-card"></i><span class="nav-text">聯絡</span></a>
     </nav>
 
-    <script>
+<script>
         // --- 設定：你的 Google Sheet CSV 連結 ---
         const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vT5uSq5naHmBPqrss4hnmmtrorqYt2LTMw0-NSsLPibD-0a2Y9jAMnQfZYfOLfnZ5o9v9HyGqDr61WB/pub?gid=1138147280&single=true&output=csv';
 
-        // --- 資料讀取邏輯 ---
-        async function loadContent() {
+        // --- V24 資料讀取邏輯 (新增：回到頁面自動更新) ---
+        async function loadContent(isAutoRefresh = false) {
             const statusBox = document.querySelector('#loading-mask div:last-child');
+            // 如果是自動刷新，就不顯示全螢幕遮罩，只在背景執行
+            if (!isAutoRefresh) {
+                const mask = document.getElementById('loading-mask');
+                if(mask) { mask.style.display = 'flex'; mask.style.opacity = '1'; }
+            }
+
             const timestamp = new Date().getTime();
             const freshUrl = `${CSV_URL}&t=${timestamp}`;
 
@@ -288,7 +294,8 @@
 
             for (let strategy of strategies) {
                 try {
-                    if(statusBox) statusBox.innerText = `資料同步中 (${strategy.name})...`;
+                    if(!isAutoRefresh && statusBox) statusBox.innerText = `資料同步中 (${strategy.name})...`;
+                    
                     const response = await fetch(strategy.url);
                     if (!response.ok) throw new Error(`${strategy.name} 回應錯誤`);
                     const text = await response.text();
@@ -296,18 +303,31 @@
                     if(!text.includes('bg-header')) throw new Error('資料格式有誤');
 
                     parseAndApplyData(text);
-                    hideLoading();
+                    
+                    if (!isAutoRefresh) hideLoading();
+                    console.log(`資料更新成功 (${strategy.name})`);
                     return; 
 
                 } catch (error) {
                     console.warn(`${strategy.name} 失敗:`, error);
                 }
             }
-            alert('⚠️ 無法讀取資料，請檢查網路或 Google 試算表設定。');
-            hideLoading();
+            if (!isAutoRefresh) {
+                alert('⚠️ 無法讀取資料，請檢查網路或 Google 試算表設定。');
+                hideLoading();
+            }
         }
 
-        // V23 專業 CSV 解析 (含自動排版功能)
+        // --- V24 新增：監聽頁面切換 (App 靈魂功能) ---
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                console.log('使用者回到 App，自動更新資料...');
+                // 傳入 true 代表這是自動更新，不要跳出 Loading 遮罩干擾使用者
+                loadContent(true);
+            }
+        });
+
+        // V23 專業 CSV 解析
         function parseCSV(text) {
             const result = [];
             let currentRow = [];
@@ -339,10 +359,13 @@
                 const content = row[1] ? row[1].trim() : '';
                 if (!key || !content) return;
 
-                // 下拉選單處理
+                // 下拉選單
                 if (key.startsWith('list-')) {
                     const selectEl = document.getElementById(key);
                     if (selectEl) {
+                        // 記住使用者目前選了什麼，更新後盡量維持選取狀態
+                        const currentVal = selectEl.value;
+                        
                         selectEl.innerHTML = '<option value="" disabled selected>請選擇...</option>';
                         const options = content.split(/,|、/);
                         options.forEach(optText => {
@@ -353,20 +376,21 @@
                                 selectEl.appendChild(option);
                             }
                         });
+
+                        // 嘗試恢復選取
+                        if(currentVal) selectEl.value = currentVal;
                     }
                     return;
                 }
 
-                // V23: 教練經歷特殊美化 (自動把換行轉成勾勾清單)
+                // 教練經歷 (自動排版)
                 if (key === 't-coach-bio') {
                     const bioEl = document.getElementById(key);
                     if (bioEl) {
-                        // 把試算表的換行切開
                         const lines = content.split(/\r?\n/);
                         let html = '';
                         lines.forEach(line => {
                             if(line.trim()) {
-                                // 包裝成帶圖標的項目
                                 html += `<div class="bio-item"><i class="fas fa-check-circle bio-icon"></i><span>${line.trim()}</span></div>`;
                             }
                         });
@@ -375,7 +399,7 @@
                     return;
                 }
 
-                // 處理一般內容
+                // 一般內容
                 const element = document.getElementById(key);
                 if (element) {
                     if (key.startsWith('img-')) {
@@ -401,7 +425,8 @@
             }
         }
 
-        window.addEventListener('DOMContentLoaded', loadContent);
+        // 第一次載入 (顯示 Loading)
+        window.addEventListener('DOMContentLoaded', () => loadContent(false));
 
         // 其他功能
         function switchPage(pageId, navElement) {
