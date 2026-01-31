@@ -249,15 +249,11 @@
         // --- 設定：你的 Google Sheet CSV 連結 ---
         const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vT5uSq5naHmBPqrss4hnmmtrorqYt2LTMw0-NSsLPibD-0a2Y9jAMnQfZYfOLfnZ5o9v9HyGqDr61WB/pub?gid=1138147280&single=true&output=csv';
 
-        // --- V21 資料讀取邏輯 (新增：時間戳記防快取) ---
+        // --- V22 資料讀取邏輯 (修復多行文字被切斷問題) ---
         async function loadContent() {
             const statusBox = document.querySelector('#loading-mask div:last-child');
-            
-            // 產生一個隨機的時間數字，例如：1716601234567
-            // 這會讓每次連線都看起來像是一個全新的請求，強迫抓取最新資料
+            // 加入時間戳記防快取
             const timestamp = new Date().getTime();
-            
-            // 將時間戳記加入網址
             const freshUrl = `${CSV_URL}&t=${timestamp}`;
 
             const strategies = [
@@ -287,15 +283,56 @@
             hideLoading();
         }
 
-        // --- 解析器 (V20版邏輯，包含換行與選單) ---
+        // --- V22 專業級 CSV 解析器 (支援 Alt+Enter 換行) ---
+        function parseCSV(text) {
+            const result = [];
+            let currentRow = [];
+            let currentCell = '';
+            let inQuotes = false;
+            
+            for (let i = 0; i < text.length; i++) {
+                const char = text[i];
+                const nextChar = text[i + 1];
+                
+                if (char === '"') {
+                    if (inQuotes && nextChar === '"') {
+                        currentCell += '"'; // 處理雙引號轉義
+                        i++;
+                    } else {
+                        inQuotes = !inQuotes; // 切換引號狀態
+                    }
+                } else if (char === ',' && !inQuotes) {
+                    currentRow.push(currentCell); // 欄位結束
+                    currentCell = '';
+                } else if ((char === '\r' || char === '\n') && !inQuotes) {
+                    // 只有在引號外面遇到的換行，才是真的換行
+                    if (char === '\r' && nextChar === '\n') i++;
+                    currentRow.push(currentCell);
+                    result.push(currentRow);
+                    currentRow = [];
+                    currentCell = '';
+                } else {
+                    currentCell += char;
+                }
+            }
+            // 處理最後一行
+            if (currentCell || currentRow.length > 0) {
+                currentRow.push(currentCell);
+                result.push(currentRow);
+            }
+            return result;
+        }
+
+        // --- 資料套用 ---
         function parseAndApplyData(text) {
-            const rows = text.split(/\r?\n/);
+            // 使用新的解析器
+            const rows = parseCSV(text);
+
             rows.forEach(row => {
-                if (!row.trim()) return;
-                const matches = row.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g);
-                if (!matches || matches.length < 2) return;
-                const key = matches[0].replace(/^"|"$/g, '').trim();
-                const content = matches[1].replace(/^"|"$/g, '').trim();
+                if (row.length < 2) return;
+                const key = row[0].trim();
+                const content = row[1] ? row[1].trim() : '';
+
                 if (!key || !content) return;
 
                 // 處理下拉選單
@@ -327,7 +364,7 @@
                     } else if (key.startsWith('link-')) {
                         element.href = content;
                     } else if (key === 't-coach-bio' || key === 't-faq-intro') {
-                        // 自動處理換行
+                        // V22: 自動把換行符號轉成網頁換行標籤
                         element.innerHTML = content.replace(/\n/g, '<br>');
                     } else {
                         element.innerText = content;
@@ -346,7 +383,7 @@
 
         window.addEventListener('DOMContentLoaded', loadContent);
 
-        // --- 頁面切換 ---
+        // --- 其他功能 (切換頁面、預約) ---
         function switchPage(pageId, navElement) {
             document.querySelectorAll('.page-container').forEach(page => page.classList.remove('active'));
             const targetId = pageId === 'gallery' ? 'page-gallery' : pageId === 'faq' ? 'page-faq' : 'page-' + pageId;
@@ -375,7 +412,6 @@
             window.scrollTo(0, 0);
         }
 
-        // --- 預約送出 ---
         function submitBooking(event) {
             event.preventDefault();
             const nameInput = document.getElementById('studentName');
