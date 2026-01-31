@@ -274,10 +274,9 @@
         // --- 設定：你的 Google Sheet CSV 連結 ---
         const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vT5uSq5naHmBPqrss4hnmmtrorqYt2LTMw0-NSsLPibD-0a2Y9jAMnQfZYfOLfnZ5o9v9HyGqDr61WB/pub?gid=1138147280&single=true&output=csv';
 
-        // --- V24 資料讀取邏輯 (新增：回到頁面自動更新) ---
+        // --- V25 極速版資料讀取 (採用並行競速邏輯) ---
         async function loadContent(isAutoRefresh = false) {
             const statusBox = document.querySelector('#loading-mask div:last-child');
-            // 如果是自動刷新，就不顯示全螢幕遮罩，只在背景執行
             if (!isAutoRefresh) {
                 const mask = document.getElementById('loading-mask');
                 if(mask) { mask.style.display = 'flex'; mask.style.opacity = '1'; }
@@ -286,48 +285,52 @@
             const timestamp = new Date().getTime();
             const freshUrl = `${CSV_URL}&t=${timestamp}`;
 
+            // 定義策略：這次把比較快的 CorsProxy 放前面，並且同時啟動
             const strategies = [
-                { name: '線路 A', url: `https://api.allorigins.win/raw?url=${encodeURIComponent(freshUrl)}` },
-                { name: '線路 B', url: `https://corsproxy.io/?${encodeURIComponent(freshUrl)}` },
-                { name: '線路 C (直連)', url: freshUrl }
+                { name: '高速線路', url: `https://corsproxy.io/?${encodeURIComponent(freshUrl)}` },
+                { name: '備用線路', url: `https://api.allorigins.win/raw?url=${encodeURIComponent(freshUrl)}` },
+                { name: '直連線路', url: freshUrl }
             ];
 
-            for (let strategy of strategies) {
-                try {
-                    if(!isAutoRefresh && statusBox) statusBox.innerText = `資料同步中 (${strategy.name})...`;
-                    
-                    const response = await fetch(strategy.url);
-                    if (!response.ok) throw new Error(`${strategy.name} 回應錯誤`);
-                    const text = await response.text();
-                    
-                    if(!text.includes('bg-header')) throw new Error('資料格式有誤');
+            try {
+                if(!isAutoRefresh && statusBox) statusBox.innerText = `資料同步中...`;
 
-                    parseAndApplyData(text);
-                    
-                    if (!isAutoRefresh) hideLoading();
-                    console.log(`資料更新成功 (${strategy.name})`);
-                    return; 
+                // V25 核心：使用 Promise.any 進行競速，誰先成功就用誰，不用傻傻等
+                const fetchPromise = (strategy) => 
+                    fetch(strategy.url)
+                        .then(async response => {
+                            if (!response.ok) throw new Error('Network response was not ok');
+                            const text = await response.text();
+                            if(!text.includes('bg-header')) throw new Error('Invalid data');
+                            return text;
+                        });
 
-                } catch (error) {
-                    console.warn(`${strategy.name} 失敗:`, error);
+                // 同時發射所有請求
+                const text = await Promise.any(strategies.map(s => fetchPromise(s)));
+
+                // 成功抓到資料
+                parseAndApplyData(text);
+                
+                if (!isAutoRefresh) hideLoading();
+                console.log(`資料極速同步成功`);
+
+            } catch (error) {
+                console.error('所有線路皆失敗', error);
+                if (!isAutoRefresh) {
+                    alert('⚠️ 網路連線較慢，或 Google 試算表設定有誤，請稍後再試。');
+                    hideLoading();
                 }
-            }
-            if (!isAutoRefresh) {
-                alert('⚠️ 無法讀取資料，請檢查網路或 Google 試算表設定。');
-                hideLoading();
             }
         }
 
-        // --- V24 新增：監聽頁面切換 (App 靈魂功能) ---
+        // --- 監聽頁面切換 (自動更新) ---
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'visible') {
-                console.log('使用者回到 App，自動更新資料...');
-                // 傳入 true 代表這是自動更新，不要跳出 Loading 遮罩干擾使用者
                 loadContent(true);
             }
         });
 
-        // V23 專業 CSV 解析
+        // --- V23 專業 CSV 解析 ---
         function parseCSV(text) {
             const result = [];
             let currentRow = [];
@@ -359,13 +362,11 @@
                 const content = row[1] ? row[1].trim() : '';
                 if (!key || !content) return;
 
-                // 下拉選單
+                // 下拉選單 (記住選擇狀態)
                 if (key.startsWith('list-')) {
                     const selectEl = document.getElementById(key);
                     if (selectEl) {
-                        // 記住使用者目前選了什麼，更新後盡量維持選取狀態
                         const currentVal = selectEl.value;
-                        
                         selectEl.innerHTML = '<option value="" disabled selected>請選擇...</option>';
                         const options = content.split(/,|、/);
                         options.forEach(optText => {
@@ -376,9 +377,11 @@
                                 selectEl.appendChild(option);
                             }
                         });
-
-                        // 嘗試恢復選取
-                        if(currentVal) selectEl.value = currentVal;
+                        if(currentVal) {
+                            // 檢查原本選的值還在不在新的清單裡
+                             const exists = Array.from(selectEl.options).some(o => o.value === currentVal);
+                             if(exists) selectEl.value = currentVal;
+                        }
                     }
                     return;
                 }
@@ -425,10 +428,10 @@
             }
         }
 
-        // 第一次載入 (顯示 Loading)
+        // 第一次載入
         window.addEventListener('DOMContentLoaded', () => loadContent(false));
 
-        // 其他功能
+        // --- 頁面功能保持不變 ---
         function switchPage(pageId, navElement) {
             document.querySelectorAll('.page-container').forEach(page => page.classList.remove('active'));
             const targetId = pageId === 'gallery' ? 'page-gallery' : pageId === 'faq' ? 'page-faq' : 'page-' + pageId;
