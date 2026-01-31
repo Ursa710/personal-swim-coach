@@ -245,17 +245,25 @@
         <a href="#" class="nav-item" onclick="switchPage('contact', this)"><i class="far fa-address-card"></i><span class="nav-text">聯絡</span></a>
     </nav>
 
-    <script>
+<script>
         // --- 設定：你的 Google Sheet CSV 連結 ---
         const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vT5uSq5naHmBPqrss4hnmmtrorqYt2LTMw0-NSsLPibD-0a2Y9jAMnQfZYfOLfnZ5o9v9HyGqDr61WB/pub?gid=1138147280&single=true&output=csv';
 
-        // --- 資料讀取邏輯 ---
+        // --- V21 資料讀取邏輯 (新增：時間戳記防快取) ---
         async function loadContent() {
             const statusBox = document.querySelector('#loading-mask div:last-child');
+            
+            // 產生一個隨機的時間數字，例如：1716601234567
+            // 這會讓每次連線都看起來像是一個全新的請求，強迫抓取最新資料
+            const timestamp = new Date().getTime();
+            
+            // 將時間戳記加入網址
+            const freshUrl = `${CSV_URL}&t=${timestamp}`;
+
             const strategies = [
-                { name: '線路 A', url: `https://api.allorigins.win/raw?url=${encodeURIComponent(CSV_URL)}` },
-                { name: '線路 B', url: `https://corsproxy.io/?${encodeURIComponent(CSV_URL)}` },
-                { name: '線路 C (直連)', url: CSV_URL }
+                { name: '線路 A', url: `https://api.allorigins.win/raw?url=${encodeURIComponent(freshUrl)}` },
+                { name: '線路 B', url: `https://corsproxy.io/?${encodeURIComponent(freshUrl)}` },
+                { name: '線路 C (直連)', url: freshUrl }
             ];
 
             for (let strategy of strategies) {
@@ -279,7 +287,7 @@
             hideLoading();
         }
 
-        // --- V20 解析器 (支援動態選單生成) ---
+        // --- 解析器 (V20版邏輯，包含換行與選單) ---
         function parseAndApplyData(text) {
             const rows = text.split(/\r?\n/);
             rows.forEach(row => {
@@ -290,13 +298,11 @@
                 const content = matches[1].replace(/^"|"$/g, '').trim();
                 if (!key || !content) return;
 
-                // 特殊處理：如果是選單資料 (list- 開頭)
+                // 處理下拉選單
                 if (key.startsWith('list-')) {
                     const selectEl = document.getElementById(key);
                     if (selectEl) {
-                        // 清空並重建模組
                         selectEl.innerHTML = '<option value="" disabled selected>請選擇...</option>';
-                        // 支援逗號或頓號分隔
                         const options = content.split(/,|、/);
                         options.forEach(optText => {
                             const cleanText = optText.trim();
@@ -311,7 +317,7 @@
                     return;
                 }
 
-                // 一般文字與圖片
+                // 處理一般內容
                 const element = document.getElementById(key);
                 if (element) {
                     if (key.startsWith('img-')) {
@@ -321,6 +327,7 @@
                     } else if (key.startsWith('link-')) {
                         element.href = content;
                     } else if (key === 't-coach-bio' || key === 't-faq-intro') {
+                        // 自動處理換行
                         element.innerHTML = content.replace(/\n/g, '<br>');
                     } else {
                         element.innerText = content;
@@ -339,7 +346,7 @@
 
         window.addEventListener('DOMContentLoaded', loadContent);
 
-        // --- 其他功能 ---
+        // --- 頁面切換 ---
         function switchPage(pageId, navElement) {
             document.querySelectorAll('.page-container').forEach(page => page.classList.remove('active'));
             const targetId = pageId === 'gallery' ? 'page-gallery' : pageId === 'faq' ? 'page-faq' : 'page-' + pageId;
@@ -368,12 +375,13 @@
             window.scrollTo(0, 0);
         }
 
+        // --- 預約送出 ---
         function submitBooking(event) {
             event.preventDefault();
             const nameInput = document.getElementById('studentName');
             const lineInput = document.getElementById('lineId');
-            const classInput = document.getElementById('list-class-types'); // V20 新增
-            const slotInput = document.getElementById('list-booking-slots'); // V20 改名
+            const classInput = document.getElementById('list-class-types');
+            const slotInput = document.getElementById('list-booking-slots');
             
             if(!nameInput.value || !lineInput.value || !classInput.value || !slotInput.value) { 
                 alert('請完整填寫資料（包含班級與時段）！'); 
@@ -383,7 +391,6 @@
             localStorage.setItem('swimStudentName', nameInput.value);
             localStorage.setItem('swimStudentLineId', lineInput.value);
 
-            // V20: Line 訊息加入班級
             const message = `🏊‍♂️ 教練您好，我要預約！%0A------------------%0A學生姓名：${nameInput.value}%0A家長Line：${lineInput.value}%0A報名班級：${classInput.value}%0A預約時段：${slotInput.value}`;
             const lineUrl = `https://line.me/R/msg/text/?${message}`;
 
