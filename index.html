@@ -112,6 +112,29 @@
         .btn-submit { width: 100%; padding: 16px; background-color: var(--primary-green); color: white; border: none; border-radius: 50px; font-size: 1.1rem; font-weight: bold; cursor: pointer; margin-top: 15px; box-shadow: 0 8px 20px rgba(79, 115, 109, 0.25); transition: transform 0.1s; }
         .btn-submit:active { transform: scale(0.98); }
         
+        /* V23: 專業經歷列表樣式 */
+        .bio-container {
+            display: inline-block;
+            text-align: left; /* 強制文字靠左 */
+            width: 100%;
+        }
+        .bio-item {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 10px; /* 縮小行距 */
+            line-height: 1.5;
+            font-size: 0.95rem;
+            color: #444;
+        }
+        .bio-item:last-child { margin-bottom: 0; }
+        .bio-icon {
+            color: var(--primary-green);
+            margin-right: 10px;
+            margin-top: 4px; /* 對齊文字頂端 */
+            flex-shrink: 0;
+            font-size: 0.9rem;
+        }
+
         .navbar-container { position: fixed; bottom: 25px; left: 50%; transform: translateX(-50%); width: 92%; max-width: 420px; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); height: var(--navbar-height); border-radius: 40px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 10px 30px rgba(0,0,0,0.1); z-index: 100; padding: 5px 15px; border: 1px solid rgba(255,255,255,0.5); }
         .nav-item { display: flex; flex-direction: column; align-items: center; justify-content: center; text-decoration: none; color: #A0A0A0; flex: 1; height: 100%; border-radius: 20px; transition: all 0.3s ease; padding: 5px 0; }
         .nav-item i { font-size: 1.35rem; margin-bottom: 4px; transition: transform 0.3s; }
@@ -169,7 +192,7 @@
         <div class="card">
             <form id="bookingForm" onsubmit="submitBooking(event)">
                 <div style="margin-bottom:15px;"><label style="display:block; margin-bottom:8px; font-weight:bold; color:var(--primary-green);">學生姓名</label><input type="text" id="studentName" placeholder="請輸入姓名" required></div>
-                <div style="margin-bottom:15px;"><label style="display:block; margin-bottom:8px; font-weight:bold; color:var(--primary-green);">Line ID或手機號碼</label><input type="text" id="lineId" placeholder="方便教練聯繫" required></div>
+                <div style="margin-bottom:15px;"><label style="display:block; margin-bottom:8px; font-weight:bold; color:var(--primary-green);">Line ID</label><input type="text" id="lineId" placeholder="方便教練聯繫" required></div>
                 
                 <div style="margin-bottom:15px;">
                     <label style="display:block; margin-bottom:8px; font-weight:bold; color:var(--primary-green);">選擇報名班級</label>
@@ -228,9 +251,11 @@
             <div style="font-size: 1.8rem; font-weight: 900; margin-bottom: 8px; color:var(--primary-green);" id="t-coach-name">陳暉教練</div>
             <div style="color:#888; font-size:1rem; font-weight:500;" id="t-coach-title">專業游泳教學</div>
             <hr style="border:0; border-top:2px dashed #eee; margin:25px 0;">
-            <div style="text-align:left; line-height:2; color:#555; display:inline-block;" id="t-coach-bio">
+            
+            <div id="t-coach-bio" class="bio-container">
                 <p>載入中...</p>
             </div>
+
         </div>
         <a href="" class="contact-btn btn-phone" id="link-phone"><i class="fas fa-phone-alt" style="margin-right:10px; font-size:1.2rem;"></i> 撥打手機號碼</a>
         <a href="" target="_blank" class="contact-btn btn-line" id="link-line"><i class="fab fa-line" style="margin-right:10px; font-size:1.4rem;"></i> 加入 Line 好友</a>
@@ -245,14 +270,13 @@
         <a href="#" class="nav-item" onclick="switchPage('contact', this)"><i class="far fa-address-card"></i><span class="nav-text">聯絡</span></a>
     </nav>
 
-<script>
+    <script>
         // --- 設定：你的 Google Sheet CSV 連結 ---
         const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vT5uSq5naHmBPqrss4hnmmtrorqYt2LTMw0-NSsLPibD-0a2Y9jAMnQfZYfOLfnZ5o9v9HyGqDr61WB/pub?gid=1138147280&single=true&output=csv';
 
-        // --- V22 資料讀取邏輯 (修復多行文字被切斷問題) ---
+        // --- 資料讀取邏輯 ---
         async function loadContent() {
             const statusBox = document.querySelector('#loading-mask div:last-child');
-            // 加入時間戳記防快取
             const timestamp = new Date().getTime();
             const freshUrl = `${CSV_URL}&t=${timestamp}`;
 
@@ -283,73 +307,70 @@
             hideLoading();
         }
 
-        // --- V22 專業級 CSV 解析器 (支援 Alt+Enter 換行) ---
+        // V23 專業 CSV 解析 (含自動排版功能)
         function parseCSV(text) {
             const result = [];
             let currentRow = [];
             let currentCell = '';
             let inQuotes = false;
-            
             for (let i = 0; i < text.length; i++) {
                 const char = text[i];
                 const nextChar = text[i + 1];
-                
                 if (char === '"') {
                     if (inQuotes && nextChar === '"') {
-                        currentCell += '"'; // 處理雙引號轉義
-                        i++;
-                    } else {
-                        inQuotes = !inQuotes; // 切換引號狀態
-                    }
+                        currentCell += '"'; i++;
+                    } else { inQuotes = !inQuotes; }
                 } else if (char === ',' && !inQuotes) {
-                    currentRow.push(currentCell); // 欄位結束
-                    currentCell = '';
+                    currentRow.push(currentCell); currentCell = '';
                 } else if ((char === '\r' || char === '\n') && !inQuotes) {
-                    // 只有在引號外面遇到的換行，才是真的換行
                     if (char === '\r' && nextChar === '\n') i++;
-                    currentRow.push(currentCell);
-                    result.push(currentRow);
-                    currentRow = [];
-                    currentCell = '';
-                } else {
-                    currentCell += char;
-                }
+                    currentRow.push(currentCell); result.push(currentRow); currentRow = []; currentCell = '';
+                } else { currentCell += char; }
             }
-            // 處理最後一行
-            if (currentCell || currentRow.length > 0) {
-                currentRow.push(currentCell);
-                result.push(currentRow);
-            }
+            if (currentCell || currentRow.length > 0) { currentRow.push(currentCell); result.push(currentRow); }
             return result;
         }
 
-        // --- 資料套用 ---
         function parseAndApplyData(text) {
-            // 使用新的解析器
             const rows = parseCSV(text);
-
             rows.forEach(row => {
                 if (row.length < 2) return;
                 const key = row[0].trim();
                 const content = row[1] ? row[1].trim() : '';
-
                 if (!key || !content) return;
 
-                // 處理下拉選單
+                // 下拉選單處理
                 if (key.startsWith('list-')) {
                     const selectEl = document.getElementById(key);
                     if (selectEl) {
                         selectEl.innerHTML = '<option value="" disabled selected>請選擇...</option>';
                         const options = content.split(/,|、/);
                         options.forEach(optText => {
-                            const cleanText = optText.trim();
-                            if(cleanText) {
+                            if(optText.trim()) {
                                 const option = document.createElement('option');
-                                option.value = cleanText;
-                                option.innerText = cleanText;
+                                option.value = optText.trim();
+                                option.innerText = optText.trim();
                                 selectEl.appendChild(option);
                             }
                         });
+                    }
+                    return;
+                }
+
+                // V23: 教練經歷特殊美化 (自動把換行轉成勾勾清單)
+                if (key === 't-coach-bio') {
+                    const bioEl = document.getElementById(key);
+                    if (bioEl) {
+                        // 把試算表的換行切開
+                        const lines = content.split(/\r?\n/);
+                        let html = '';
+                        lines.forEach(line => {
+                            if(line.trim()) {
+                                // 包裝成帶圖標的項目
+                                html += `<div class="bio-item"><i class="fas fa-check-circle bio-icon"></i><span>${line.trim()}</span></div>`;
+                            }
+                        });
+                        bioEl.innerHTML = html;
                     }
                     return;
                 }
@@ -363,8 +384,7 @@
                         element.style.backgroundImage = `url('${content}')`;
                     } else if (key.startsWith('link-')) {
                         element.href = content;
-                    } else if (key === 't-coach-bio' || key === 't-faq-intro') {
-                        // V22: 自動把換行符號轉成網頁換行標籤
+                    } else if (key === 't-faq-intro') {
                         element.innerHTML = content.replace(/\n/g, '<br>');
                     } else {
                         element.innerText = content;
@@ -383,7 +403,7 @@
 
         window.addEventListener('DOMContentLoaded', loadContent);
 
-        // --- 其他功能 (切換頁面、預約) ---
+        // 其他功能
         function switchPage(pageId, navElement) {
             document.querySelectorAll('.page-container').forEach(page => page.classList.remove('active'));
             const targetId = pageId === 'gallery' ? 'page-gallery' : pageId === 'faq' ? 'page-faq' : 'page-' + pageId;
@@ -423,13 +443,10 @@
                 alert('請完整填寫資料（包含班級與時段）！'); 
                 return; 
             }
-            
             localStorage.setItem('swimStudentName', nameInput.value);
             localStorage.setItem('swimStudentLineId', lineInput.value);
-
             const message = `🏊‍♂️ 教練您好，我要預約！%0A------------------%0A學生姓名：${nameInput.value}%0A家長Line：${lineInput.value}%0A報名班級：${classInput.value}%0A預約時段：${slotInput.value}`;
             const lineUrl = `https://line.me/R/msg/text/?${message}`;
-
             if(confirm(`即將開啟 Line 傳送預約資訊給教練：\n\n學生：${nameInput.value}\n班級：${classInput.value}\n時段：${slotInput.value}`)) {
                 window.location.href = lineUrl;
             }
