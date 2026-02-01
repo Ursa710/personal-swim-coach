@@ -114,7 +114,7 @@
         .btn-submit { width: 100%; padding: 16px; background-color: var(--primary-green); color: white; border: none; border-radius: 50px; font-size: 1.1rem; font-weight: bold; cursor: pointer; margin-top: 15px; box-shadow: 0 8px 20px rgba(79, 115, 109, 0.25); transition: transform 0.1s; }
         .btn-submit:active { transform: scale(0.98); }
         
-        /* V31: 卡片式選單樣式 (Options UI) */
+        /* V32: 日期/時間分層選單樣式 */
         .options-grid { display: flex; flex-direction: column; gap: 10px; }
         
         /* 班級卡片 */
@@ -127,17 +127,22 @@
         .class-option.selected i { color: var(--primary-green); }
         .class-text { font-weight: bold; color: var(--text-dark); font-size: 0.95rem; }
 
-        /* 時段膠囊 */
+        /* 日期/時間按鈕 */
         .slots-grid { display: flex; flex-wrap: wrap; gap: 10px; }
         .slot-pill { 
             padding: 10px 15px; border: 1px solid #E0E0E0; border-radius: 30px; background: white; 
-            font-size: 0.9rem; color: #555; cursor: pointer; transition: all 0.2s; flex: 1 1 calc(50% - 10px); text-align: center;
+            font-size: 0.9rem; color: #555; cursor: pointer; transition: all 0.2s; flex: 1 1 calc(33% - 10px); text-align: center;
         }
         .slot-pill.selected { background-color: var(--primary-green); color: white; border-color: var(--primary-green); box-shadow: 0 4px 10px rgba(79, 115, 109, 0.2); }
         /* 額滿狀態 */
         .slot-pill.disabled { background-color: #F0F0F0; color: #AAA; border-color: #EEE; cursor: not-allowed; pointer-events: none; }
+        
+        .section-label { display:block; margin-bottom:8px; font-weight:bold; color:var(--primary-green); display:flex; justify-content:space-between; align-items:center; }
+        .section-hint { font-size:0.8rem; color:#aaa; font-weight:normal; }
+        
+        /* V33: 尚未選擇班級時的遮罩 */
+        .disabled-section { opacity: 0.5; pointer-events: none; filter: grayscale(1); }
 
-        /* 隱藏原本的 Select */
         .hidden-select { display: none; }
 
         .bio-container { display: inline-block; text-align: left; width: 100%; }
@@ -203,21 +208,27 @@
                 <div style="margin-bottom:15px;"><label style="display:block; margin-bottom:8px; font-weight:bold; color:var(--primary-green);">學生姓名</label><input type="text" id="studentName" placeholder="請輸入姓名" required></div>
                 <div style="margin-bottom:15px;"><label style="display:block; margin-bottom:8px; font-weight:bold; color:var(--primary-green);">Line ID</label><input type="text" id="lineId" placeholder="方便教練聯繫" required></div>
                 
-                <div style="margin-bottom:20px;">
-                    <label style="display:block; margin-bottom:8px; font-weight:bold; color:var(--primary-green);">選擇報名班級</label>
+                <div style="margin-bottom:25px;">
+                    <label class="section-label">選擇報名班級</label>
                     <div id="class-options-visual" class="options-grid">
                         <div style="color:#aaa; font-size:0.9rem;">載入中...</div>
                     </div>
                     <select id="list-class-types" class="hidden-select" required><option value="">請選擇</option></select>
                 </div>
 
-                <div style="margin-bottom:20px;">
-                    <label style="display:block; margin-bottom:8px; font-weight:bold; color:var(--primary-green);">選擇可預約時段</label>
-                    <div id="slot-options-visual" class="slots-grid">
-                        <div style="color:#aaa; font-size:0.9rem;">載入中...</div>
+                <div id="date-section-container" class="disabled-section" style="margin-bottom:20px;">
+                    <label class="section-label">預約日期 <span class="section-hint" id="date-hint">(請先選班級)</span></label>
+                    <div id="date-options-visual" class="slots-grid">
+                        <div style="color:#aaa; font-size:0.9rem;">請先選擇上方班級...</div>
                     </div>
-                    <select id="list-booking-slots" class="hidden-select" required><option value="">請選擇</option></select>
                 </div>
+
+                <div style="margin-bottom:20px; display:none;" id="time-section">
+                    <label class="section-label">選擇時段</label>
+                    <div id="time-options-visual" class="slots-grid"></div>
+                </div>
+
+                <select id="list-booking-slots" class="hidden-select" required><option value="">請選擇</option></select>
 
                 <button type="submit" class="btn-submit"><i class="fab fa-line" style="margin-right:5px;"></i> 送出預約 (自動傳訊)</button>
             </form>
@@ -275,6 +286,10 @@
 
     <script>
         const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vT5uSq5naHmBPqrss4hnmmtrorqYt2LTMw0-NSsLPibD-0a2Y9jAMnQfZYfOLfnZ5o9v9HyGqDr61WB/pub?gid=1138147280&single=true&output=csv';
+        
+        let bookingData = {}; 
+        let currentClass = '';
+        let selectedDate = '';
 
         async function loadContent(isAutoRefresh = false) {
             const statusBox = document.querySelector('#loading-mask div:last-child');
@@ -347,13 +362,14 @@
                 const content = row[1] ? row[1].trim() : '';
                 if (!key || !content) return;
 
-                // V31: 處理班級與時段 (渲染成卡片)
                 if (key === 'list-class-types') {
                     renderVisualOptions('class-options-visual', 'list-class-types', content, 'class');
                     return;
                 }
+                
                 if (key === 'list-booking-slots') {
-                    renderVisualOptions('slot-options-visual', 'list-booking-slots', content, 'slot');
+                    parseBookingSlots(content);
+                    // 這裡不直接渲染日期，因為要等使用者選班級
                     return;
                 }
 
@@ -389,13 +405,122 @@
             });
         }
 
-        // V31: 視覺化選單渲染邏輯
+        // V33: 智能解析 [標籤] 日期 時間
+        function parseBookingSlots(content) {
+            bookingData = {};
+            const items = content.split(/,|、/);
+            items.forEach(item => {
+                const fullText = item.trim();
+                if(!fullText) return;
+
+                // 1. 抓取標籤 [xxx]
+                let tag = "all";
+                let remainingText = fullText;
+                
+                const match = fullText.match(/^\[(.*?)\]\s*(.*)/);
+                if (match) {
+                    tag = match[1]; // 標籤內容 (例如 "一對一")
+                    remainingText = match[2]; // 剩下的日期時間
+                }
+
+                // 2. 切割日期與時間
+                const parts = remainingText.split(/\s+/);
+                if (parts.length >= 2) {
+                    const date = parts[0];
+                    const time = parts.slice(1).join(' '); 
+                    
+                    if (!bookingData[date]) {
+                        bookingData[date] = [];
+                    }
+                    // 存入物件: { time: "09:00", type: "一對一" }
+                    bookingData[date].push({ time: time, type: tag });
+                }
+            });
+        }
+
+        // V33: 根據選到的班級，過濾日期
+        function renderDateOptions() {
+            const visualContainer = document.getElementById('date-options-visual');
+            const timeSection = document.getElementById('time-section');
+            const realSelect = document.getElementById('list-booking-slots');
+            const dateSectionContainer = document.getElementById('date-section-container');
+            const dateHint = document.getElementById('date-hint');
+            
+            // 解鎖日期區塊
+            dateSectionContainer.classList.remove('disabled-section');
+            dateHint.innerText = "(請點選日期)";
+            dateHint.style.display = 'inline';
+
+            visualContainer.innerHTML = '';
+            realSelect.value = '';
+            selectedDate = '';
+            timeSection.style.display = 'none';
+
+            let hasAvailableDates = false;
+
+            Object.keys(bookingData).forEach(date => {
+                // 檢查這一天有沒有適合目前班級的時段
+                const availableTimes = bookingData[date].filter(slot => {
+                    // 規則：如果時段沒標籤(all) 或者 時段標籤 包含在 目前班級名稱內 (模糊比對)
+                    return slot.type === 'all' || currentClass.includes(slot.type);
+                });
+
+                if (availableTimes.length > 0) {
+                    hasAvailableDates = true;
+                    const visualEl = document.createElement('div');
+                    visualEl.className = 'slot-pill';
+                    visualEl.innerText = date;
+                    
+                    visualEl.onclick = () => {
+                        visualContainer.querySelectorAll('.slot-pill').forEach(el => el.classList.remove('selected'));
+                        visualEl.classList.add('selected');
+                        
+                        selectedDate = date;
+                        dateHint.style.display = 'none';
+                        renderTimeOptions(date, availableTimes); // 傳入過濾後的時段
+                    };
+                    visualContainer.appendChild(visualEl);
+                }
+            });
+
+            if (!hasAvailableDates) {
+                visualContainer.innerHTML = '<div style="color:#888; padding:10px; width:100%;">此課程目前無可預約日期</div>';
+            }
+        }
+
+        // V33: 渲染過濾後的時段
+        function renderTimeOptions(date, availableTimes) {
+            const timeContainer = document.getElementById('time-options-visual');
+            const timeSection = document.getElementById('time-section');
+            const realSelect = document.getElementById('list-booking-slots');
+            
+            timeContainer.innerHTML = '';
+            timeSection.style.display = 'block';
+            
+            availableTimes.forEach(slot => {
+                const timeText = slot.time;
+                const isFull = timeText.includes('額滿') || timeText.includes('full');
+                const visualEl = document.createElement('div');
+                visualEl.className = 'slot-pill';
+                if(isFull) visualEl.classList.add('disabled');
+                visualEl.innerText = timeText;
+                
+                if(!isFull) {
+                    visualEl.onclick = () => {
+                        timeContainer.querySelectorAll('.slot-pill').forEach(el => el.classList.remove('selected'));
+                        visualEl.classList.add('selected');
+                        realSelect.value = `${date} ${timeText}`;
+                    };
+                }
+                timeContainer.appendChild(visualEl);
+            });
+        }
+
         function renderVisualOptions(visualContainerId, realSelectId, contentString, type) {
             const visualContainer = document.getElementById(visualContainerId);
             const realSelect = document.getElementById(realSelectId);
             if(!visualContainer || !realSelect) return;
 
-            // 保持當前選擇
             const currentVal = realSelect.value;
             visualContainer.innerHTML = '';
             realSelect.innerHTML = '<option value="">請選擇</option>';
@@ -404,43 +529,28 @@
             options.forEach(optText => {
                 const text = optText.trim();
                 if(!text) return;
-
-                // 更新真實 Select (邏輯用)
                 const optionEl = document.createElement('option');
                 optionEl.value = text;
                 optionEl.innerText = text;
                 realSelect.appendChild(optionEl);
-
-                // 創建視覺卡片/按鈕
-                const isFull = text.includes('額滿') || text.includes('full');
-                const visualEl = document.createElement('div');
                 
-                if (type === 'class') {
-                    visualEl.className = 'class-option';
-                    visualEl.innerHTML = `<i class="fas fa-swimmer"></i><div class="class-text">${text}</div>`;
-                } else {
-                    visualEl.className = 'slot-pill';
-                    if(isFull) visualEl.classList.add('disabled');
-                    visualEl.innerText = text;
-                }
-
-                // 點擊事件
-                if(!isFull) {
-                    visualEl.onclick = () => {
-                        // 1. 更新真實 Select
-                        realSelect.value = text;
-                        // 2. 更新視覺樣式
-                        visualContainer.querySelectorAll('.' + (type==='class'?'class-option':'slot-pill')).forEach(el => el.classList.remove('selected'));
-                        visualEl.classList.add('selected');
-                    };
-                }
-
-                // 恢復選取狀態
+                const visualEl = document.createElement('div');
+                visualEl.className = 'class-option';
+                visualEl.innerHTML = `<i class="fas fa-swimmer"></i><div class="class-text">${text}</div>`;
+                
+                visualEl.onclick = () => {
+                    realSelect.value = text;
+                    currentClass = text; // V33: 紀錄目前選的班級
+                    visualContainer.querySelectorAll('.class-option').forEach(el => el.classList.remove('selected'));
+                    visualEl.classList.add('selected');
+                    
+                    // V33: 觸發日期過濾
+                    renderDateOptions();
+                };
                 if (currentVal === text) {
                     realSelect.value = text;
                     visualEl.classList.add('selected');
                 }
-
                 visualContainer.appendChild(visualEl);
             });
         }
@@ -484,7 +594,7 @@
             const lineInput = document.getElementById('lineId');
             const classInput = document.getElementById('list-class-types');
             const slotInput = document.getElementById('list-booking-slots');
-            if(!nameInput.value || !lineInput.value || !classInput.value || !slotInput.value) { alert('請完整填寫資料（點選班級與時段）！'); return; }
+            if(!nameInput.value || !lineInput.value || !classInput.value || !slotInput.value) { alert('請完整填寫資料（包含班級、日期與時段）！'); return; }
             localStorage.setItem('swimStudentName', nameInput.value);
             localStorage.setItem('swimStudentLineId', lineInput.value);
             const message = `🏊‍♂️ 教練您好，我要預約！%0A------------------%0A學生姓名：${nameInput.value}%0A家長Line：${lineInput.value}%0A報名班級：${classInput.value}%0A預約時段：${slotInput.value}`;
