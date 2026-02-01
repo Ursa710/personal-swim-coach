@@ -21,7 +21,7 @@
             --primary-green: #4F736D; 
             --secondary-green: #8DA9A3; 
             --accent-orange: #E68A73; 
-            --line-green: #06C755; /* V34: 新增 Line 綠色 */
+            --line-green: #06C755;
             --bg-light: #F7F9F9;
             --text-dark: #2C3E3C;
             --white: #FFFFFF;
@@ -102,6 +102,7 @@
         .btn-cta-pop { width: auto; padding: 10px 22px; background-color: var(--accent-orange); color: white; border: none; border-radius: 30px; font-size: 0.95rem; font-weight: bold; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.2); white-space: nowrap; margin-left: 15px; transition: transform 0.1s; }
         .btn-cta-pop:active { transform: scale(0.95); }
 
+        /* V35: FAQ 樣式調整 */
         details { border-bottom: 1px solid #eee; padding: 12px 0; }
         details:last-child { border-bottom: none; }
         summary { font-weight: bold; color: var(--text-dark); cursor: pointer; list-style: none; display: flex; align-items: center; justify-content: space-between; }
@@ -113,21 +114,18 @@
 
         input, select { width: 100%; padding: 15px; border: 2px solid #E0E0E0; border-radius: 15px; font-size: 1rem; outline: none; background: #FAFAFA; transition: all 0.3s; appearance: none; -webkit-appearance: none; }
         
-        /* V34: 按鈕改為 Line 綠色 */
         .btn-submit { 
             width: 100%; padding: 16px; 
-            background-color: var(--line-green); /* 使用 Line 綠 */
+            background-color: var(--line-green);
             color: white; border: none; border-radius: 50px; 
             font-size: 1.1rem; font-weight: bold; cursor: pointer; 
             margin-top: 15px; 
-            box-shadow: 0 8px 20px rgba(6, 199, 85, 0.25); /* 陰影也配合綠色 */
+            box-shadow: 0 8px 20px rgba(6, 199, 85, 0.25);
             transition: transform 0.1s; 
         }
         .btn-submit:active { transform: scale(0.98); }
         
-        /* 班級/日期選單 */
         .options-grid { display: flex; flex-direction: column; gap: 10px; }
-        
         .class-option { 
             padding: 15px; border: 2px solid #E0E0E0; border-radius: 15px; background: white; 
             cursor: pointer; transition: all 0.2s; display: flex; align-items: center;
@@ -147,9 +145,7 @@
         
         .section-label { display:block; margin-bottom:8px; font-weight:bold; color:var(--primary-green); display:flex; justify-content:space-between; align-items:center; }
         .section-hint { font-size:0.8rem; color:#aaa; font-weight:normal; }
-        
         .disabled-section { opacity: 0.5; pointer-events: none; filter: grayscale(1); }
-
         .hidden-select { display: none; }
 
         .bio-container { display: inline-block; text-align: left; width: 100%; }
@@ -253,10 +249,9 @@
         <h2 class="page-title-simple" id="t-page-faq">常見問題</h2>
         <div class="card">
             <h3 class="faq-title" id="t-faq-intro" style="color:var(--primary-green); margin-top:0; font-size:1.1rem; margin-bottom:20px; line-height:1.5;">有任何疑問嗎？</h3>
-            <details><summary id="t-faq-q1">問題1載入中...</summary><div class="faq-answer" id="t-faq-a1">...</div></details>
-            <details><summary id="t-faq-q2">問題2載入中...</summary><div class="faq-answer" id="t-faq-a2">...</div></details>
-            <details><summary id="t-faq-q3">問題3載入中...</summary><div class="faq-answer" id="t-faq-a3">...</div></details>
-            <details><summary id="t-faq-q4">問題4載入中...</summary><div class="faq-answer" id="t-faq-a4">...</div></details>
+            <div id="faq-dynamic-container">
+                <div style="text-align:center; color:#999;">載入中...</div>
+            </div>
         </div>
     </div>
 
@@ -304,6 +299,8 @@
         let bookingData = {}; 
         let currentClass = '';
         let selectedDate = '';
+        // V35: 儲存 FAQ 資料
+        let faqData = {};
 
         async function loadContent(isAutoRefresh = false) {
             const statusBox = document.querySelector('#loading-mask div:last-child');
@@ -370,6 +367,8 @@
 
         function parseAndApplyData(text) {
             const rows = parseCSV(text);
+            faqData = {}; // 重置 FAQ 資料
+
             rows.forEach(row => {
                 if (row.length < 2) return;
                 const key = row[0].trim();
@@ -401,6 +400,21 @@
                     return;
                 }
 
+                // V35: 智慧解析 FAQ 題目
+                if (key.startsWith('t-faq-q')) {
+                    const id = key.replace('t-faq-q', '');
+                    if(!faqData[id]) faqData[id] = {};
+                    faqData[id].q = content;
+                    return;
+                }
+                // V35: 智慧解析 FAQ 答案
+                if (key.startsWith('t-faq-a')) {
+                    const id = key.replace('t-faq-a', '');
+                    if(!faqData[id]) faqData[id] = {};
+                    faqData[id].a = content;
+                    return;
+                }
+
                 const element = document.getElementById(key);
                 if (element) {
                     if (key.startsWith('img-')) {
@@ -416,6 +430,36 @@
                     }
                 }
             });
+
+            // V35: 所有資料解析完後，渲染 FAQ
+            renderFAQ();
+        }
+
+        // V35: 動態渲染 FAQ 列表
+        function renderFAQ() {
+            const container = document.getElementById('faq-dynamic-container');
+            if(!container) return;
+            
+            // 將 FAQ 物件轉為陣列並排序 (1, 2, 3...)
+            const sortedKeys = Object.keys(faqData).sort((a,b) => parseInt(a) - parseInt(b));
+            
+            if(sortedKeys.length === 0) {
+                container.innerHTML = '<div style="text-align:center; padding:20px; color:#aaa;">暫無常見問題</div>';
+                return;
+            }
+
+            let html = '';
+            sortedKeys.forEach(key => {
+                const item = faqData[key];
+                if(item.q && item.a) {
+                    html += `
+                    <details>
+                        <summary>${item.q}</summary>
+                        <div class="faq-answer">${item.a}</div>
+                    </details>`;
+                }
+            });
+            container.innerHTML = html;
         }
 
         function parseBookingSlots(content) {
@@ -597,7 +641,6 @@
             const classInput = document.getElementById('list-class-types');
             const slotInput = document.getElementById('list-booking-slots');
             
-            // V34: 更新驗證提示文字
             if(!nameInput.value || !lineInput.value || !classInput.value || !slotInput.value) { 
                 alert('請完整填寫資料（包含班級、日期、時段與電話）！'); 
                 return; 
@@ -606,7 +649,6 @@
             localStorage.setItem('swimStudentName', nameInput.value);
             localStorage.setItem('swimStudentLineId', lineInput.value);
             
-            // V34: 更新 Line 傳送訊息內容
             const message = `🏊‍♂️ 教練您好，我要預約！%0A------------------%0A學生姓名：${nameInput.value}%0A聯絡電話/Line：${lineInput.value}%0A報名班級：${classInput.value}%0A預約時段：${slotInput.value}`;
             const lineUrl = `https://line.me/R/msg/text/?${message}`;
             
