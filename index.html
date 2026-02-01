@@ -12,7 +12,6 @@
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/625/625470.png">
     
     <link rel="manifest" href="manifest.json">
-
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;600;900&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
     
@@ -112,13 +111,35 @@
         .faq-answer { font-size: 0.9rem; color: #666; line-height: 1.6; padding-right: 10px; }
 
         input, select { width: 100%; padding: 15px; border: 2px solid #E0E0E0; border-radius: 15px; font-size: 1rem; outline: none; background: #FAFAFA; transition: all 0.3s; appearance: none; -webkit-appearance: none; }
-        .select-wrapper { position: relative; }
-        .select-wrapper::after { content: '\f078'; font-family: 'Font Awesome 6 Free'; font-weight: 900; position: absolute; right: 15px; top: 50%; transform: translateY(-50%); color: var(--primary-green); pointer-events: none; }
-        input:focus, select:focus { border-color: var(--primary-green); background: #fff; box-shadow: 0 0 0 4px rgba(79, 115, 109, 0.1); }
         .btn-submit { width: 100%; padding: 16px; background-color: var(--primary-green); color: white; border: none; border-radius: 50px; font-size: 1.1rem; font-weight: bold; cursor: pointer; margin-top: 15px; box-shadow: 0 8px 20px rgba(79, 115, 109, 0.25); transition: transform 0.1s; }
         .btn-submit:active { transform: scale(0.98); }
         
-        /* V23: 專業經歷列表樣式 */
+        /* V31: 卡片式選單樣式 (Options UI) */
+        .options-grid { display: flex; flex-direction: column; gap: 10px; }
+        
+        /* 班級卡片 */
+        .class-option { 
+            padding: 15px; border: 2px solid #E0E0E0; border-radius: 15px; background: white; 
+            cursor: pointer; transition: all 0.2s; display: flex; align-items: center;
+        }
+        .class-option.selected { border-color: var(--primary-green); background-color: rgba(79, 115, 109, 0.05); box-shadow: 0 4px 10px rgba(79, 115, 109, 0.1); }
+        .class-option i { margin-right: 12px; font-size: 1.2rem; color: #ccc; transition: color 0.2s; }
+        .class-option.selected i { color: var(--primary-green); }
+        .class-text { font-weight: bold; color: var(--text-dark); font-size: 0.95rem; }
+
+        /* 時段膠囊 */
+        .slots-grid { display: flex; flex-wrap: wrap; gap: 10px; }
+        .slot-pill { 
+            padding: 10px 15px; border: 1px solid #E0E0E0; border-radius: 30px; background: white; 
+            font-size: 0.9rem; color: #555; cursor: pointer; transition: all 0.2s; flex: 1 1 calc(50% - 10px); text-align: center;
+        }
+        .slot-pill.selected { background-color: var(--primary-green); color: white; border-color: var(--primary-green); box-shadow: 0 4px 10px rgba(79, 115, 109, 0.2); }
+        /* 額滿狀態 */
+        .slot-pill.disabled { background-color: #F0F0F0; color: #AAA; border-color: #EEE; cursor: not-allowed; pointer-events: none; }
+
+        /* 隱藏原本的 Select */
+        .hidden-select { display: none; }
+
         .bio-container { display: inline-block; text-align: left; width: 100%; }
         .bio-item { display: flex; align-items: flex-start; margin-bottom: 10px; line-height: 1.5; font-size: 0.95rem; color: #444; }
         .bio-item:last-child { margin-bottom: 0; }
@@ -136,7 +157,6 @@
         .btn-phone { background-color: var(--primary-green); }
         .btn-line { background-color: #06C755; }
         .btn-ig { background: linear-gradient(45deg, #f09433 0%,#e6683c 25%,#dc2743 50%,#cc2366 75%,#bc1888 100%); }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body>
@@ -181,25 +201,24 @@
         <div class="card">
             <form id="bookingForm" onsubmit="submitBooking(event)">
                 <div style="margin-bottom:15px;"><label style="display:block; margin-bottom:8px; font-weight:bold; color:var(--primary-green);">學生姓名</label><input type="text" id="studentName" placeholder="請輸入姓名" required></div>
-                <div style="margin-bottom:15px;"><label style="display:block; margin-bottom:8px; font-weight:bold; color:var(--primary-green);">家長聯絡電話或LINE ID</label><input type="text" id="lineId" placeholder="方便教練聯繫" required></div>
+                <div style="margin-bottom:15px;"><label style="display:block; margin-bottom:8px; font-weight:bold; color:var(--primary-green);">Line ID</label><input type="text" id="lineId" placeholder="方便教練聯繫" required></div>
                 
-                <div style="margin-bottom:15px;">
+                <div style="margin-bottom:20px;">
                     <label style="display:block; margin-bottom:8px; font-weight:bold; color:var(--primary-green);">選擇報名班級</label>
-                    <div class="select-wrapper">
-                        <select id="list-class-types" required style="font-weight:500; color:#333;">
-                            <option value="" disabled selected>載入班級中...</option>
-                        </select>
+                    <div id="class-options-visual" class="options-grid">
+                        <div style="color:#aaa; font-size:0.9rem;">載入中...</div>
                     </div>
+                    <select id="list-class-types" class="hidden-select" required><option value="">請選擇</option></select>
                 </div>
 
-                <div style="margin-bottom:15px;">
+                <div style="margin-bottom:20px;">
                     <label style="display:block; margin-bottom:8px; font-weight:bold; color:var(--primary-green);">選擇可預約時段</label>
-                    <div class="select-wrapper">
-                        <select id="list-booking-slots" required style="font-weight:500; color:#333;">
-                            <option value="" disabled selected>載入時段中...</option>
-                        </select>
+                    <div id="slot-options-visual" class="slots-grid">
+                        <div style="color:#aaa; font-size:0.9rem;">載入中...</div>
                     </div>
+                    <select id="list-booking-slots" class="hidden-select" required><option value="">請選擇</option></select>
                 </div>
+
                 <button type="submit" class="btn-submit"><i class="fab fa-line" style="margin-right:5px;"></i> 送出預約 (自動傳訊)</button>
             </form>
         </div>
@@ -209,7 +228,6 @@
         <h2 class="page-title-simple" id="t-page-faq">常見問題</h2>
         <div class="card">
             <h3 class="faq-title" id="t-faq-intro" style="color:var(--primary-green); margin-top:0; font-size:1.1rem; margin-bottom:20px; line-height:1.5;">有任何疑問嗎？</h3>
-            
             <details><summary id="t-faq-q1">問題1載入中...</summary><div class="faq-answer" id="t-faq-a1">...</div></details>
             <details><summary id="t-faq-q2">問題2載入中...</summary><div class="faq-answer" id="t-faq-a2">...</div></details>
             <details><summary id="t-faq-q3">問題3載入中...</summary><div class="faq-answer" id="t-faq-a3">...</div></details>
@@ -240,11 +258,7 @@
             <div style="font-size: 1.8rem; font-weight: 900; margin-bottom: 8px; color:var(--primary-green);" id="t-coach-name">陳暉教練</div>
             <div style="color:#888; font-size:1rem; font-weight:500;" id="t-coach-title">專業游泳教學</div>
             <hr style="border:0; border-top:2px dashed #eee; margin:25px 0;">
-            
-            <div id="t-coach-bio" class="bio-container">
-                <p>載入中...</p>
-            </div>
-
+            <div id="t-coach-bio" class="bio-container"><p>載入中...</p></div>
         </div>
         <a href="" class="contact-btn btn-phone" id="link-phone"><i class="fas fa-phone-alt" style="margin-right:10px; font-size:1.2rem;"></i> 撥打手機號碼</a>
         <a href="" target="_blank" class="contact-btn btn-line" id="link-line"><i class="fab fa-line" style="margin-right:10px; font-size:1.4rem;"></i> 加入 Line 好友</a>
@@ -252,11 +266,11 @@
     </div>
 
     <nav class="navbar-container">
-        <a href="#" class="nav-item active" onclick="switchPage('course', this)"><i class="fas fa-swimmer"></i><span class="nav-text">課程</span></a>
-        <a href="#" class="nav-item" onclick="switchPage('booking', this)"><i class="far fa-calendar-check"></i><span class="nav-text">預約</span></a>
-        <a href="#" class="nav-item" onclick="switchPage('faq', this)"><i class="far fa-question-circle"></i><span class="nav-text">問答</span></a>
-        <a href="#" class="nav-item" onclick="switchPage('gallery', this)"><i class="fas fa-camera"></i><span class="nav-text">花絮</span></a>
-        <a href="#" class="nav-item" onclick="switchPage('contact', this)"><i class="far fa-address-card"></i><span class="nav-text">聯絡</span></a>
+        <a href="javascript:void(0)" class="nav-item active" onclick="switchPage('course', this)"><i class="fas fa-swimmer"></i><span class="nav-text">課程</span></a>
+        <a href="javascript:void(0)" class="nav-item" onclick="switchPage('booking', this)"><i class="far fa-calendar-check"></i><span class="nav-text">預約</span></a>
+        <a href="javascript:void(0)" class="nav-item" onclick="switchPage('faq', this)"><i class="far fa-question-circle"></i><span class="nav-text">問答</span></a>
+        <a href="javascript:void(0)" class="nav-item" onclick="switchPage('gallery', this)"><i class="fas fa-camera"></i><span class="nav-text">花絮</span></a>
+        <a href="javascript:void(0)" class="nav-item" onclick="switchPage('contact', this)"><i class="far fa-address-card"></i><span class="nav-text">聯絡</span></a>
     </nav>
 
     <script>
@@ -333,25 +347,13 @@
                 const content = row[1] ? row[1].trim() : '';
                 if (!key || !content) return;
 
-                if (key.startsWith('list-')) {
-                    const selectEl = document.getElementById(key);
-                    if (selectEl) {
-                        const currentVal = selectEl.value;
-                        selectEl.innerHTML = '<option value="" disabled selected>請選擇...</option>';
-                        const options = content.split(/,|、/);
-                        options.forEach(optText => {
-                            if(optText.trim()) {
-                                const option = document.createElement('option');
-                                option.value = optText.trim();
-                                option.innerText = optText.trim();
-                                selectEl.appendChild(option);
-                            }
-                        });
-                        if(currentVal) {
-                             const exists = Array.from(selectEl.options).some(o => o.value === currentVal);
-                             if(exists) selectEl.value = currentVal;
-                        }
-                    }
+                // V31: 處理班級與時段 (渲染成卡片)
+                if (key === 'list-class-types') {
+                    renderVisualOptions('class-options-visual', 'list-class-types', content, 'class');
+                    return;
+                }
+                if (key === 'list-booking-slots') {
+                    renderVisualOptions('slot-options-visual', 'list-booking-slots', content, 'slot');
                     return;
                 }
 
@@ -384,6 +386,62 @@
                         element.innerText = content;
                     }
                 }
+            });
+        }
+
+        // V31: 視覺化選單渲染邏輯
+        function renderVisualOptions(visualContainerId, realSelectId, contentString, type) {
+            const visualContainer = document.getElementById(visualContainerId);
+            const realSelect = document.getElementById(realSelectId);
+            if(!visualContainer || !realSelect) return;
+
+            // 保持當前選擇
+            const currentVal = realSelect.value;
+            visualContainer.innerHTML = '';
+            realSelect.innerHTML = '<option value="">請選擇</option>';
+
+            const options = contentString.split(/,|、/);
+            options.forEach(optText => {
+                const text = optText.trim();
+                if(!text) return;
+
+                // 更新真實 Select (邏輯用)
+                const optionEl = document.createElement('option');
+                optionEl.value = text;
+                optionEl.innerText = text;
+                realSelect.appendChild(optionEl);
+
+                // 創建視覺卡片/按鈕
+                const isFull = text.includes('額滿') || text.includes('full');
+                const visualEl = document.createElement('div');
+                
+                if (type === 'class') {
+                    visualEl.className = 'class-option';
+                    visualEl.innerHTML = `<i class="fas fa-swimmer"></i><div class="class-text">${text}</div>`;
+                } else {
+                    visualEl.className = 'slot-pill';
+                    if(isFull) visualEl.classList.add('disabled');
+                    visualEl.innerText = text;
+                }
+
+                // 點擊事件
+                if(!isFull) {
+                    visualEl.onclick = () => {
+                        // 1. 更新真實 Select
+                        realSelect.value = text;
+                        // 2. 更新視覺樣式
+                        visualContainer.querySelectorAll('.' + (type==='class'?'class-option':'slot-pill')).forEach(el => el.classList.remove('selected'));
+                        visualEl.classList.add('selected');
+                    };
+                }
+
+                // 恢復選取狀態
+                if (currentVal === text) {
+                    realSelect.value = text;
+                    visualEl.classList.add('selected');
+                }
+
+                visualContainer.appendChild(visualEl);
             });
         }
 
@@ -426,7 +484,7 @@
             const lineInput = document.getElementById('lineId');
             const classInput = document.getElementById('list-class-types');
             const slotInput = document.getElementById('list-booking-slots');
-            if(!nameInput.value || !lineInput.value || !classInput.value || !slotInput.value) { alert('請完整填寫資料！'); return; }
+            if(!nameInput.value || !lineInput.value || !classInput.value || !slotInput.value) { alert('請完整填寫資料（點選班級與時段）！'); return; }
             localStorage.setItem('swimStudentName', nameInput.value);
             localStorage.setItem('swimStudentLineId', lineInput.value);
             const message = `🏊‍♂️ 教練您好，我要預約！%0A------------------%0A學生姓名：${nameInput.value}%0A家長Line：${lineInput.value}%0A報名班級：${classInput.value}%0A預約時段：${slotInput.value}`;
